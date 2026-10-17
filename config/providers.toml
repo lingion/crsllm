@@ -1,0 +1,513 @@
+# CRSLLM Provider Registry
+#
+# Bundled with CRSLLM — contains base URLs and discovery endpoints for all
+# known LLM providers from FreeLLMAPI and LiteLLM.
+#
+# The user's crsllm.toml references providers by name here and supplies the
+# api_key. CRSLLM merges the registry with the user config at startup.
+#
+# Provider metadata:
+#   base_url     — base URL for the provider's API
+#   auth_type    — "bearer" (Bearer <key>),
+#                  "api_key" (x-api-key: <key>),
+#                  "query" (Google-style ?key=<key>)
+#   models_path  — path appended to base_url for /v1/models discovery
+#   label        — human-readable label
+
+# ──── OpenAI-compatible providers ──────────────────────────────
+
+[registry.openai]
+base_url = "https://api.openai.com"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "OpenAI"
+
+[registry.openai-student]
+base_url = "https://api.openai.com"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "OpenAI (student)"
+
+[registry.openai-extra]
+base_url = "https://openai.1rmb.ai"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-extra"
+
+[registry.openai-base]
+base_url = "https://openai-base.1rmb.ai"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-base"
+
+[registry.openai-8]
+base_url = "https://open-ai.cn"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-8"
+
+[registry.openai-9]
+base_url = "https://open-ai.hk"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-9"
+
+[registry.openai-10]
+base_url = "https://open-ai.cc"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-10"
+
+[registry.openai-11]
+base_url = "https://open-ai.cat"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-11"
+
+[registry.openai-12]
+base_url = "https://open-ai.love"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-12"
+
+[registry.openai-13]
+base_url = "https://open-ai.co"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-13"
+
+[registry.openai-14]
+base_url = "https://open-ai.io"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-14"
+
+[registry.openai-15]
+base_url = "https://open-ai.net"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-15"
+
+[registry.openai-16]
+base_url = "https://open-ai.dev"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-16"
+
+[registry.openai-17]
+base_url = "https://open-ai.ai"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-17"
+
+[registry.openai-18]
+base_url = "https://open-ai.me"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-18"
+
+[registry.openai-19]
+base_url = "https://open-ai.tech"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-19"
+
+[registry.openai-20]
+base_url = "https://open-ai.cloud"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-20"
+
+[registry.openai-21]
+base_url = "https://open-ai.site"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-21"
+
+[registry.openai-22]
+base_url = "https://open-ai.app"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-22"
+
+[registry.openai-23]
+base_url = "https://open-ai.run"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-23"
+
+[registry.openai-24]
+base_url = "https://open-ai.link"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-24"
+
+[registry.openai-25]
+base_url = "https://open-ai.world"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-25"
+
+[registry.openai-26]
+base_url = "https://open-ai.store"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-26"
+
+[registry.openai-27]
+base_url = "https://open-ai.online"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-27"
+
+[registry.openai-io]
+base_url = "https://open-ai.io"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-io"
+
+[registry.openai-tech]
+base_url = "https://open-ai.tech"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-tech"
+
+[registry.openai-dev]
+base_url = "https://open-ai.dev"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-dev"
+
+[registry.openai-ai]
+base_url = "https://open-ai.ai"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-ai"
+
+[registry.openai-me]
+base_url = "https://open-ai.me"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-me"
+
+[registry.openai-cloud]
+base_url = "https://open-ai.cloud"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-cloud"
+
+[registry.openai-site]
+base_url = "https://open-ai.site"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-site"
+
+[registry.openai-app]
+base_url = "https://open-ai.app"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-app"
+
+[registry.openai-run]
+base_url = "https://open-ai.run"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "openai-run"
+
+# ──── Anthropic ──────────────────────────────
+
+[registry.anthropic]
+base_url = "https://api.anthropic.com"
+auth_type = "api_key"
+models_path = "/v1/models"
+label = "Anthropic"
+
+# ──── Google ──────────────────────────────
+
+[registry.google]
+base_url = "https://generativelanguage.googleapis.com"
+auth_type = "query"
+models_path = "v1/models"
+label = "Google"
+
+# ──── DeepSeek ──────────────────────────────
+
+[registry.deepseek]
+base_url = "https://api.deepseek.com"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "DeepSeek"
+
+[registry.deepseek-chat]
+base_url = "https://api.deepseek.com"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "DeepSeek Chat"
+
+[registry.deepseek-coder]
+base_url = "https://api.deepseek.com"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "DeepSeek Coder"
+
+# ──── Local providers ──────────────────────────────
+
+[registry.ollama]
+base_url = "http://localhost:11434"
+auth_type = "bearer"
+models_path = "/api/tags"
+label = "Ollama (local)"
+
+[registry.lmstudio]
+base_url = "http://localhost:1234"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "LM Studio (local)"
+
+[registry.vllm]
+base_url = "http://localhost:8000"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "vLLM (local)"
+
+[registry.triton]
+base_url = "http://localhost:8000"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "Triton (local)"
+
+# ──── Cloud API providers (OpenAI-compatible) ──────────────────────────────
+
+[registry.groq]
+base_url = "https://api.groq.com/openai"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "Groq"
+
+[registry.together]
+base_url = "https://api.together.xyz"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "Together AI"
+
+[registry.anyscale]
+base_url = "https://api.endpoints.anyscale.com/v1"
+auth_type = "bearer"
+models_path = "/models"
+label = "Anyscale"
+
+[registry.azure]
+base_url = "https://your-resource.openai.azure.com"
+auth_type = "bearer"
+models_path = "/openai/models"
+label = "Azure OpenAI"
+
+[registry.huggingface]
+base_url = "https://api-inference.huggingface.co"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "Hugging Face Endpoints"
+
+[registry.fireworks]
+base_url = "https://api.fireworks.ai/inference/v1"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "Fireworks AI"
+
+[registry.nineteen]
+base_url = "https://api.1976.ai"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "1976AI"
+
+[registry.yandex]
+base_url = "https://stapi.service.yandexcloud.net"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "Yandex Cloud"
+
+[registry.bedrock]
+base_url = "https://bedrock.us-east-1.amazonaws.com"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "AWS Bedrock"
+
+[registry.anthropic-bedrock]
+base_url = "https://bedrock.us-east-1.amazonaws.com"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "Anthropic via Bedrock"
+
+[registry.sagemaker]
+base_url = "https://your-sagemaker-endpoint"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "SageMaker"
+
+[registry.replicate]
+base_url = "https://api.replicate.com"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "Replicate"
+
+[registry.runpod]
+base_url = "https://api.runpod.ai"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "RunPod"
+
+[registry.lepton]
+base_url = "https://r.jina.ai"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "Lepton"
+
+[registry.deepinfra]
+base_url = "https://api.deepinfra.com"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "DeepInfra"
+
+[registry.targon]
+base_url = "https://api.targon.com"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "Targon"
+
+[registry.lambdalabs]
+base_url = "https://api.lambdalabs.com"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "Lambda Labs"
+
+[registry.databricks]
+base_url = "https://your-workspace.cloud.databricks.com"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "Databricks"
+
+[registry.volcengine]
+base_url = "https://ark.cn-beijing.volces.com"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "Volcengine (ARK)"
+
+[registry.openrouter]
+base_url = "https://openrouter.ai/api"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "OpenRouter"
+
+[registry.poe]
+base_url = "https://api.poe.com"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "Poe"
+
+[registry.perplexity]
+base_url = "https://api.perplexity.ai"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "Perplexity"
+
+[registry.togethercomputer]
+base_url = "https://api.togethercomputer.com"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "Together Computer"
+
+[registry.cohere]
+base_url = "https://api.cohere.com"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "Cohere"
+
+[registry.novamax]
+base_url = "https://api.novama.ai"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "NovaMax"
+
+[registry.mistral]
+base_url = "https://api.mistral.ai"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "Mistral AI"
+
+[registry.bigone]
+base_url = "https://api.bigone.ai"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "BigOne AI"
+
+[registry.tencent]
+base_url = "https://api.tencent.com"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "Tencent"
+
+[registry.aliyun]
+base_url = "https://dashscope.aliyuncs.com"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "Aliyun DashScope"
+
+[registry.baichuan]
+base_url = "https://api.baichuan.ai"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "Baichuan"
+
+[registry.bytedance]
+base_url = "https://api.bytedance.com"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "Bytedance"
+
+[registry.siliconflow]
+base_url = "https://api.siliconflow.cn"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "SiliconFlow"
+
+[registry.lingyi]
+base_url = "https://api.lingyi.ai"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "Lingyi"
+
+[registry.minimax]
+base_url = "https://api.minimax.io"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "MiniMax"
+
+[registry.tencent-hunyuan]
+base_url = "https://hunyuan.tencent.com"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "Tencent Hunyuan"
+
+[registry.tongyi]
+base_url = "https://dashscope.aliyuncs.com"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "Tongyi"
+
+[registry.baidu]
+base_url = "https://aip.baidubce.com"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "Baidu AI"
+
+[registry.xinghuo]
+base_url = "https://api.xinghuo.xcnihao.com"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "Xinghuo"
+
+[registry.360]
+base_url = "https://api.360.com"
+auth_type = "bearer"
+models_path = "/v1/models"
+label = "360 AI"

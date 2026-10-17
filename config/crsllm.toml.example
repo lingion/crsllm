@@ -1,0 +1,89 @@
+# CRSLLM — TOML configuration reference
+#
+# Layout:
+#   [providers.*] — named API key + base URL entries
+#   [models.<group>] — a logical model group with an ordered provider fallback list
+#   [fallback_chain] — cross-model-group fallback order
+#   [timeouts] — SSE inactivity + overall deadline (seconds)
+#
+# Model ID mapping:
+#   Each provider ref in a model group can override `model_id` to map the
+#   logical group name to the provider's native model ID.
+#   If omitted, the model group name itself is used as the model ID.
+
+# ── Gateway client keys ───────────────────────────────────────────
+# Keys clients must present to call /v1/* (via `x-api-key` or
+# `Authorization: Bearer <key>`). Empty or omitted = open access.
+# Manage them live from the console (API Keys tab) or /api/api-keys.
+[gateway]
+api_keys = []
+
+# ── Provider credentials ──────────────────────────────────────────
+# Each entry is a named credential set (referenced by name in model groups).
+[providers.openai]
+api_key = "sk-..."
+base_url = "https://api.openai.com/v1"
+
+[providers.anthropic]
+api_key = "sk-ant-..."
+base_url = "https://api.anthropic.com"
+
+[providers.google]
+api_key = "AIza..."
+base_url = "https://generativelanguage.googleapis.com/v1beta"
+
+# ── Model groups ──────────────────────────────────────────────────
+# Within a group, providers are tried in order (intra-group fallback).
+# The group name IS the logical model name exposed by CRSLLM.
+[models."gpt-4o"]
+# provider refs — each binds a provider by name + optional model_id override
+providers = [
+  { provider = "openai", model_id = "gpt-4o" },
+  { provider = "openai", model_id = "gpt-4o-2024-08-06" },   # fallback within same provider
+]
+
+[models."claude-sonnet-4"]
+providers = [
+  { provider = "anthropic", model_id = "claude-sonnet-4-20250514" },
+  { provider = "openai", model_id = "gpt-4o" },              # cross-provider fallback
+]
+
+[models."gemini-2.0-flash"]
+providers = [
+  { provider = "google", model_id = "gemini-2.0-flash" },
+  { provider = "anthropic", model_id = "claude-3-5-sonnet-20241022" },
+]
+
+# ── Cross-model-group fallback chain ──────────────────────────────
+# If ALL providers in the requested model group fail, the router tries
+# the next group in this chain. The requested model group is always tried
+# first (deduplicated automatically).
+[fallback_chain]
+order = ["claude-sonnet-4", "gpt-4o", "gemini-2.0-flash"]
+
+# ── Timeouts ──────────────────────────────────────────────────────
+# sse_inactivity_secs: how long to wait without a chunk before failover (default 90)
+# deadline_secs:       overall request deadline (default 120)
+[timeouts]
+sse_inactivity_secs = 90
+deadline_secs = 120
+
+# ── Auto model discovery ──────────────────────────────────────────
+# When a provider has both `api_key` and `base_url` configured (as above),
+# CRSLLM can automatically fetch the list of available models from the provider's
+# API. This is triggered by:
+#
+#   1. CLI:  crsllm --discover-models [--config path/to/crsllm.toml]
+#      Prints models discovered from every configured provider.
+#
+#   2. API:  GET /v1/models
+#      Returns a JSON map: { "provider_name": ["model_id", ...], ... }
+#
+# Each provider adapter calls its standard list-models endpoint:
+#   - OpenAI:   GET {base_url}/v1/models  (Authorization: Bearer <key>)
+#   - Anthropic: GET {base_url}/v1/models  (x-api-key: <key>)
+#   - Google:    GET {base_url}/models?key=<key>
+#
+# Discovered model names are the provider's native IDs and can be used to
+# populate `[models.*]` groups. Failures for individual providers are logged
+# but do not block discovery of other providers.
