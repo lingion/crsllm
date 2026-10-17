@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-labelledby="title desc">
+  <title id="title">crsllm mark</title>
+  <desc id="desc">An original geometric mark: a client node on the left fans out through a gateway ring to three provider nodes on the right, with a failover path highlighted.</desc>
+  <rect width="160" height="160" rx="40" fill="#0a0e27"/>
+  <!-- gateway ring -->
+  <circle cx="80" cy="80" r="26" fill="none" stroke="#4facfe" stroke-width="7"/>
+  <!-- client node -->
+  <circle cx="26" cy="80" r="9" fill="#4facfe"/>
+  <!-- fan-out paths to provider nodes -->
+  <path d="M100 70 L134 40" fill="none" stroke="#5a6178" stroke-width="6" stroke-linecap="round"/>
+  <path d="M106 80 L134 80" fill="none" stroke="#43e97b" stroke-width="6" stroke-linecap="round"/>
+  <path d="M100 90 L134 120" fill="none" stroke="#5a6178" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="138" cy="38" r="8" fill="#5a6178"/>
+  <circle cx="140" cy="80" r="8" fill="#43e97b"/>
+  <circle cx="138" cy="122" r="8" fill="#5a6178"/>
+  <!-- client-to-ring link -->
+  <path d="M36 80 L54 80" fill="none" stroke="#4facfe" stroke-width="6" stroke-linecap="round"/>
+</svg>
