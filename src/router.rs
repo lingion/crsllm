@@ -448,54 +448,66 @@ impl Router {
         })
     }
 
+    /// Probe every provider's list-models endpoint **concurrently**.
+    ///
+    /// Sequential probing made a full refresh take `providers × 30s × retries`
+    /// in the worst case (minutes). Each provider keeps its own 30s timeout
+    /// and 2 attempts, but all providers run side by side, so wall-clock time
+    /// is bounded by the single slowest provider.
     pub async fn discover_models(&self) -> HashMap<String, Vec<String>> {
-        let mut results = HashMap::new();
         let config = self.config.read().await;
-        
-        // 使用30秒超时（参考freellmapi），某些provider的/v1/models响应较慢
+
         let timeout_duration = std::time::Duration::from_secs(30);
-        
-        for (name, provider_config) in &config.providers {
-            let model_id = name.clone();
-            let adapter = self.create_registry_adapter(name, provider_config.clone(), model_id);
-            
-            // 添加重试机制：最多重试2次
-            let mut attempts = 0;
-            let max_attempts = 2;
-            
-            loop {
-                attempts += 1;
-                
-                match tokio::time::timeout(timeout_duration, adapter.list_models()).await {
-                    Ok(Ok(models)) => {
-                        tracing::info!("Discovered {} models from {}", models.len(), name);
-                        results.insert(name.clone(), models);
-                        break;
-                    }
-                    Ok(Err(e)) => {
-                        if attempts < max_attempts {
-                            tracing::warn!("Attempt {}/{} failed for {}: {}, retrying...", attempts, max_attempts, name, e);
-                            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                            continue;
-                        } else {
-                            tracing::warn!("Failed to discover models from {} after {} attempts: {}", name, max_attempts, e);
-                            break;
+        let futures = config.providers.iter().map(|(name, provider_config)| {
+            let adapter = self.create_registry_adapter(name, provider_config.clone(), name.clone());
+            let name = name.clone();
+            async move {
+                let mut attempts = 0u8;
+                let max_attempts = 2;
+                loop {
+                    attempts += 1;
+                    match tokio::time::timeout(timeout_duration, adapter.list_models()).await {
+                        Ok(Ok(models)) => {
+                            tracing::info!("Discovered {} models from {}", models.len(), name);
+                            return Some((name, models));
                         }
-                    }
-                    Err(_) => {
-                        if attempts < max_attempts {
-                            tracing::warn!("Attempt {}/{} timeout for {}, retrying...", attempts, max_attempts, name);
-                            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                            continue;
-                        } else {
+                        Ok(Err(e)) => {
+                            if attempts < max_attempts {
+                                tracing::warn!(
+                                    "Attempt {}/{} failed for {}: {}, retrying...",
+                                    attempts, max_attempts, name, e
+                                );
+                                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                                continue;
+                            }
+                            tracing::warn!(
+                                "Failed to discover models from {} after {} attempts: {}",
+                                name, max_attempts, e
+                            );
+                            return None;
+                        }
+                        Err(_) => {
+                            if attempts < max_attempts {
+                                tracing::warn!(
+                                    "Attempt {}/{} timeout for {}, retrying...",
+                                    attempts, max_attempts, name
+                                );
+                                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                                continue;
+                            }
                             tracing::warn!("Timeout discovering models from {} after {} attempts", name, max_attempts);
-                            break;
+                            return None;
                         }
                     }
                 }
             }
-        }
-        results
+        });
+
+        futures::future::join_all(futures)
+            .await
+            .into_iter()
+            .flatten()
+            .collect()
     }
 
     /// Save discovered models to a TOML file.

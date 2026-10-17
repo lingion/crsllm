@@ -51,7 +51,7 @@ CRSLLM 是一个**单二进制、可自托管**的 LLM 前置网关。客户端�
 | 接口 | Anthropic `/v1/messages` + OpenAI `/v1/chat/completions`，协议透明互转 |
 | 路由 | 模型组 · 路由模型 · 全局回退链 · 供应商优先级与启停 |
 | 容错 | 错误分类即时故障转移、SSE 空闲/断流守护、分阶段超时（连接/首字/生成/总时限） |
-| 模型发现 | `GET /v1/models` / `--discover-models` 探测所有供应商原生模型列表 |
+| 模型发现 | `POST /api/refresh-models` 并发探测所有供应商并缓存结果；`GET /v1/models` 即时返回 OpenAI 格式 `data[]` |
 | 访问控制 | 客户端 API Key（`x-api-key` 或 `Authorization: Bearer`），控制台创建/轮换/吊销 |
 | 控制台 | 实时 Web 面板：供应商、模型组、路由、回退、API 密钥、请求日志、指标曲线 |
 | 可观测 | `/metrics`、请求历史、每供应商成功率/TTFT 统计并持久化到配置 |
@@ -191,7 +191,8 @@ deadline_secs       = 120
 |---|---|---|
 | `POST /v1/messages` | 客户端 Key* | Anthropic Messages（Claude 协议） |
 | `POST /v1/chat/completions` | 客户端 Key* | OpenAI Chat Completions（内部翻译） |
-| `GET /v1/models` | 客户端 Key* | 跨供应商模型发现 |
+| `GET /v1/models` | 客户端 Key* | 列出缓存模型（OpenAI 格式，不做实时探测） |
+| `POST /api/refresh-models` | 仅本机 | 并发重探所有供应商，更新缓存与自动模型组 |
 | `GET /health` | 开放 | 存活探测 |
 | `GET /metrics` | 开放 | 每供应商聚合统计 |
 | `GET /dashboard` | 仅本机 | 内嵌 Web 控制台 |

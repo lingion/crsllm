@@ -1269,7 +1269,7 @@ $("btn-refresh-models").onclick = async () => {
     $("btn-refresh-models").disabled = true;
     $("btn-refresh-models").innerHTML = '<span class="spinner" style="margin-right:6px;"></span>Refreshing…';
     try {
-        const res = await api("/api/models/refresh", { method: "POST" });
+        const res = await api("/api/refresh-models", { method: "POST" });
         let n = 0;
         for (const k in res.refreshed) n += (res.refreshed[k].count ?? 0);
         toast("✓ Refreshed " + Object.keys(res.refreshed).length + " providers · " + n + " models · " + (res.auto_groups_created ?? "?") + " groups", "ok", 5000);

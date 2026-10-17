@@ -52,7 +52,7 @@ Requests are resolved through **model groups** (an ordered provider list per log
 | Interfaces | Anthropic `/v1/messages` + OpenAI `/v1/chat/completions`, transparent cross-translation |
 | Routing | Model groups · routed models · global fallback chain · per-provider priority & enable/disable |
 | Resilience | Error classification with instant failover, SSE streaming with inactivity + EOF guarding, per-stage timeouts (connect/TTFT/generation/total) |
-| Discovery | `GET /v1/models` / `--discover-models` probes every provider's native list-models endpoint |
+| Discovery | `POST /api/refresh-models` probes every provider concurrently and caches results; `GET /v1/models` then serves OpenAI-shaped `data[]` instantly |
 | Access control | Client API keys (via `x-api-key` header or `Authorization: Bearer`), create/rotate/revoke from the console |
 | Console | Live web dashboard: providers, groups, routes, fallback, API keys, request logs, metrics sparklines |
 | Observability | `/metrics`, request history, per-provider success/TTFT stats persisted in config |
@@ -192,7 +192,8 @@ Changes made in the console are written back to `config/crsllm.toml` and hot-rel
 |---|---|---|
 | `POST /v1/messages` | client key* | Anthropic Messages (Claude dialect) |
 | `POST /v1/chat/completions` | client key* | OpenAI Chat Completions (translated internally) |
-| `GET /v1/models` | client key* | Discover models across all configured providers |
+| `GET /v1/models` | client key* | List cached models (OpenAI shape, no live probing) |
+| `POST /api/refresh-models` | loopback | Re-probe all providers concurrently, update cache & auto-groups |
 | `GET /health` | open | Liveness probe |
 | `GET /metrics` | open | Aggregated per-provider stats |
 | `GET /dashboard` | loopback | Embedded web console |

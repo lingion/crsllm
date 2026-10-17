@@ -831,27 +831,58 @@ pub async fn delete_routed_model(
     }
 }
 
-/// Discover available models from all configured providers.
+/// List models in OpenAI-compatible shape, served from the discovery cache.
+///
+/// Live probing here would block the request for up to 30s per slow
+/// provider; clients expect `/v1/models` to be a cheap metadata call.
+/// Use `POST /api/refresh-models` (or `--discover-models`) to repopulate.
 pub async fn list_models(State(router): State<AppState>) -> Response {
-    let results = router.discover_models().await;
-    let mut json_map = serde_json::Map::new();
-    for (provider, models) in &results {
-        json_map.insert(provider.clone(), serde_json::json!(models));
-    }
-    (StatusCode::OK, Json(serde_json::Value::Object(json_map))).into_response()
+    let config = router.config_snapshot().await;
+    let mut entries: Vec<_> = config.discovered.iter().collect();
+    entries.sort_by_key(|(p, _)| p.as_str());
+    let data: Vec<_> = entries
+        .iter()
+        .flat_map(|(provider, models)| {
+            models.iter().map(move |m| json!({
+                "id": m,
+                "object": "model",
+                "created": 0,
+                "owned_by": provider,
+            }))
+        })
+        .collect();
+    (StatusCode::OK, Json(json!({ "object": "list", "data": data }))).into_response()
 }
 
-/// 重新扫描所有提供商的模型列表
+/// 重新扫描所有提供商的模型列表（并发探测、持久化缓存，并返回前端消费的字段）
 pub async fn refresh_models(State(router): State<AppState>) -> Response {
     let results = router.discover_models().await;
-    
+
+    // Persist so /v1/models and the dashboard can serve from cache instantly.
+    {
+        let mut config = router.config_snapshot().await.as_ref().clone();
+        let existing: std::collections::HashSet<_> = config.providers.keys().cloned().collect();
+        config.discovered.retain(|p, _| existing.contains(p));
+        for (provider, models) in &results {
+            config.discovered.insert(provider.clone(), models.clone());
+        }
+        if let Err(e) = crate::config::save_config(&config, "config/crsllm.toml") {
+            return (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to save config: {}", e)).into_response();
+        }
+        router.reload_config(config).await;
+    }
+
     let total_providers = results.len();
     let total_models: usize = results.values().map(|m| m.len()).sum();
-    
+    let auto_groups = auto_generate_model_groups(&results);
+    let auto_groups_created = auto_groups.len();
+
     (StatusCode::OK, Json(json!({
         "message": "模型列表刷新完成",
         "providers": total_providers,
         "total_models": total_models,
+        "refreshed": results.iter().map(|(p, m)| (p.clone(), json!({ "count": m.len() }))).collect::<serde_json::Map<_, _>>(),
+        "auto_groups_created": auto_groups_created,
         "details": results.iter().map(|(p, m)| json!({
             "provider": p,
             "model_count": m.len()
