@@ -1,0 +1,1372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRSLLM Gateway Console</title>
+<style>
+:root {
+    --bg: #0a0e27;
+    --bg-panel: #10142e;
+    --bg-raised: #151932;
+    --bg-inset: #1e2340;
+    --line: #232a4d;
+    --line-strong: #2f3763;
+    --text: #e4e7f0;
+    --text-dim: #8b92a8;
+    --text-mute: #5a6178;
+    --accent: #4facfe;
+    --accent-2: #00f2fe;
+    --ok: #43e97b;
+    --warn: #feca57;
+    --err: #ff6b6b;
+    --off: #5a6178;
+    --focus: #00f2fe;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Cascadia Code', monospace;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.6;
+    font-variant-numeric: tabular-nums;
+}
+
+button, input, select, textarea {
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+}
+
+:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 1px;
+}
+
+.container { max-width: 1800px; margin: 0 auto; padding: 0 24px 48px; }
+
+header {
+    display: flex; flex-wrap: wrap; gap: 16px;
+    justify-content: space-between; align-items: center;
+    padding: 20px 0 14px;
+    border-bottom: 1px solid var(--line);
+}
+.brand h1 { font-size: 18px; font-weight: 700; letter-spacing: 0.5px; }
+.brand h1 .glyph { color: var(--accent); }
+.brand .tagline { color: var(--text-mute); font-size: 11px; }
+.status-line {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 16px;
+    font-size: 11px; color: var(--text-dim);
+}
+.live-dot {
+    display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--ok); margin-right: 6px; vertical-align: 1px;
+    animation: pulse 2.4s ease-in-out infinite;
+}
+.live-dot.down { background: var(--err); animation: none; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) {
+    .live-dot { animation: none; }
+    .spinner { animation: none !important; }
+    * { transition: none !important; }
+}
+.hdr-actions { display: flex; gap: 8px; }
+
+.stats-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1px; background: var(--line);
+    border: 1px solid var(--line); border-top: none;
+    margin-bottom: 20px;
+}
+.stat-cell { background: var(--bg-panel); padding: 12px 16px; }
+.stat-cell .label { font-size: 10px; color: var(--text-mute); }
+.stat-cell .value { font-size: 22px; font-weight: 700; color: var(--accent); line-height: 1.3; }
+.stat-cell .value small { font-size: 11px; color: var(--text-dim); font-weight: 400; }
+
+.tablist {
+    display: flex; gap: 1px; background: var(--line);
+    border: 1px solid var(--line); margin-bottom: 1px;
+    overflow-x: auto;
+}
+.tab {
+    padding: 10px 18px; background: var(--bg-panel); border: none;
+    color: var(--text-dim); cursor: pointer; font-size: 12px;
+    white-space: nowrap;
+}
+.tab:hover { background: var(--bg-raised); color: var(--text); }
+.tab[aria-selected="true"] {
+    background: var(--bg-inset); color: var(--accent);
+    box-shadow: inset 0 -2px 0 var(--accent);
+}
+.tab.active {
+    background: var(--bg-inset); color: var(--accent);
+    box-shadow: inset 0 -2px 0 var(--accent);
+}
+.tab .count { color: var(--text-mute); font-size: 10px; margin-left: 6px; }
+
+.panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
+    margin-bottom: 36px;
+    padding: 16px;
+}
+.panel[hidden] { display: none; }
+.panel-toolbar {
+    display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between;
+    align-items: center; margin-bottom: 14px;
+}
+.section-label {
+    font-size: 11px; color: var(--text-dim); margin: 18px 0 8px;
+}
+
+.btn {
+    background: var(--bg-inset); color: var(--text);
+    border: 1px solid var(--line-strong); padding: 5px 12px;
+    font-size: 12px; cursor: pointer;
+}
+.btn:hover { background: var(--line-strong); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #04101f; font-weight: 600; }
+.btn-primary:hover { background: var(--accent-2); border-color: var(--accent-2); }
+.btn-danger { background: transparent; border-color: var(--err); color: var(--err); }
+.btn-danger:hover { background: var(--err); color: #1a0505; }
+.btn-sm { padding: 2px 8px; font-size: 11px; }
+
+.badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 2px 8px; font-size: 10px; border: 1px solid;
+    white-space: nowrap;
+}
+.badge.ok    { color: var(--ok);   border-color: rgba(67,233,123,.4);  background: rgba(67,233,123,.08); }
+.badge.warn  { color: var(--warn); border-color: rgba(254,202,87,.4);  background: rgba(254,202,87,.08); }
+.badge.err   { color: var(--err);  border-color: rgba(255,107,107,.4); background: rgba(255,107,107,.08); }
+.badge.idle  { color: var(--text-dim); border-color: var(--line-strong); background: var(--bg-inset); }
+.badge.off   { color: #c3c9db; border-color: var(--off); background: repeating-linear-gradient(135deg, transparent 0 4px, rgba(90,97,120,.12) 4px 8px); }
+
+.switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 11px; color: var(--text-dim); }
+.switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+.switch .track {
+    width: 34px; height: 18px; background: var(--bg-inset);
+    border: 1px solid var(--line-strong); position: relative; flex: none;
+}
+.switch .track::after {
+    content: ""; position: absolute; top: 2px; left: 2px;
+    width: 12px; height: 12px; background: var(--text-mute);
+    transition: left .15s ease, background .15s ease;
+}
+.switch input:checked + .track { background: rgba(67,233,123,.18); border-color: var(--ok); }
+.switch input:checked + .track::after { left: 18px; background: var(--ok); }
+.switch input:focus-visible + .track { outline: 2px solid var(--focus); outline-offset: 1px; }
+.switch .sw-text { min-width: 44px; }
+
+.provider-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(430px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+.provider-card { background: var(--bg-panel); padding: 14px 16px; }
+.provider-card.disabled-card { opacity: .55; }
+.pc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+.pc-name { font-size: 14px; font-weight: 700; word-break: break-all; }
+.pc-url { color: var(--text-mute); font-size: 10px; word-break: break-all; }
+.pc-key { color: var(--text-mute); font-size: 10px; }
+.pc-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
+.pc-stat { background: var(--bg-inset); padding: 6px 8px; }
+.pc-stat .l { font-size: 9px; color: var(--text-mute); }
+.pc-stat .v { font-size: 13px; font-weight: 600; }
+.pc-foot { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pc-spark { display: flex; align-items: center; gap: 6px; font-size: 9px; color: var(--text-mute); }
+
+.row {
+    background: var(--bg-panel); border: 1px solid var(--line);
+    padding: 10px 14px; margin-bottom: 6px;
+    display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center;
+}
+.row .r-main { flex: 1; min-width: 240px; }
+.row .r-name { font-weight: 600; }
+.row .r-chips { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.chip { background: var(--bg-inset); border: 1px solid var(--line); padding: 1px 8px; font-size: 11px; color: var(--text-dim); }
+.chip .ord { color: var(--accent-2); font-weight: 700; margin-right: 4px; }
+.arrow { color: var(--text-mute); }
+.row .r-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.chain-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .chain-layout { grid-template-columns: 1fr; } }
+.chain-pane { border: 1px solid var(--line); background: var(--bg-panel); }
+.chain-pane .pane-head { padding: 8px 12px; font-size: 11px; color: var(--text-dim); border-bottom: 1px solid var(--line); background: var(--bg-raised); }
+.chain-pane .pane-body { padding: 10px 12px; max-height: 340px; overflow-y: auto; }
+.chain-list-item {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--bg-inset); border: 1px solid var(--line);
+    padding: 5px 10px; margin-bottom: 5px;
+}
+.chain-list-item .pos { color: var(--accent-2); font-weight: 700; min-width: 26px; }
+.chain-list-item .nm { flex: 1; word-break: break-all; }
+.chain-empty { color: var(--text-mute); font-style: italic; padding: 8px; font-size: 11px; }
+.two-pane { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 900px) { .two-pane { grid-template-columns: 1fr; } }
+.pane-box { max-height: 320px; overflow-y: auto; border: 1px solid var(--line); background: var(--bg-inset); padding: 4px; }
+.chain-list-item .ord { color: var(--accent-2); font-weight: 700; font-size: 10px; }
+.picker-label { display: flex; gap: 8px; align-items: center; padding: 3px 4px; cursor: pointer; font-size: 12px; }
+.picker-label input { accent-color: var(--accent); }
+.picker-search { width: 100%; padding: 6px 8px; background: var(--bg-inset); border: 1px solid var(--line); margin-bottom: 8px; }
+
+.log-wrap { border: 1px solid var(--line); }
+.log-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.log-table th {
+    text-align: left; padding: 6px 10px; color: var(--text-dim);
+    border-bottom: 1px solid var(--line); background: var(--bg-raised);
+    font-weight: 600; position: sticky; top: 0;
+}
+.log-table td { padding: 5px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.log-table tr:hover td { background: var(--bg-raised); }
+.log-scroll { max-height: 520px; overflow-y: auto; }
+.log-chain { color: var(--text-dim); word-break: break-all; }
+
+.modal {
+    position: fixed; inset: 0; z-index: 1000;
+    background: rgba(4, 7, 22, .82);
+    display: none; align-items: center; justify-content: center; padding: 20px;
+}
+.modal.active { display: flex; }
+.modal-content {
+    background: var(--bg-raised); border: 1px solid var(--line-strong);
+    width: 100%; max-width: 640px; max-height: 92vh; overflow-y: auto;
+}
+.modal-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 20px; border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; background: var(--bg-raised);
+}
+.modal-head h3 { font-size: 15px; font-weight: 600; }
+.modal-close { background: none; border: none; color: var(--text-mute); font-size: 22px; cursor: pointer; line-height: 1; padding: 2px 8px; }
+.modal-close:hover { color: var(--text); }
+.modal-body { padding: 20px; }
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; color: var(--text-dim); font-size: 11px; margin-bottom: 5px; }
+.form-group input, .form-group textarea, .form-group select {
+    width: 100%; padding: 7px 8px; background: var(--bg-inset);
+    border: 1px solid var(--line); color: var(--text);
+}
+.form-group .help { font-size: 10px; color: var(--text-mute); margin-top: 4px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+
+#toast-zone { position: fixed; bottom: 20px; right: 20px; z-index: 1100; display: flex; flex-direction: column; gap: 8px; max-width: 420px; }
+.toast {
+    background: var(--bg-raised); border: 1px solid var(--line-strong);
+    border-left: 3px solid var(--accent);
+    padding: 10px 14px; font-size: 12px; box-shadow: 0 4px 18px rgba(0,0,0,.5);
+}
+.toast.err { border-left-color: var(--err); }
+.toast.ok { border-left-color: var(--ok); }
+.toast.warn { border-left-color: var(--warn); }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.result-badge { font-size: 10px; font-weight: 700; padding: 1px 6px; border: 1px solid; text-transform: uppercase; }
+.result-badge.ok  { color: var(--ok);   border-color: rgba(67,233,123,.4); }
+.result-badge.err { color: var(--err);  border-color: rgba(255,107,107,.4); }
+.result-badge.exh { color: var(--warn); border-color: rgba(254,202,87,.4); }
+.log-err { color: var(--err); font-size: 10px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ts { color: var(--text-mute); white-space: nowrap; }
+.loading { text-align: center; padding: 36px; color: var(--text-dim); }
+.spinner { border: 2px solid var(--line); border-top: 2px solid var(--accent); border-radius: 50%; width: 28px; height: 28px; animation: spin 1s linear infinite; margin: 0 auto 12px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.empty-state { padding: 30px; text-align: center; color: var(--text-dim); border: 1px dashed var(--line-strong); font-size: 12px; }
+
+@media (max-width: 768px) {
+    .provider-grid { grid-template-columns: 1fr; }
+    .pc-stats { grid-template-columns: repeat(2, 1fr); }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .form-row { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+    <header>
+        <div class="brand">
+            <h1><span class="glyph">&gt;_</span> CRSLLM Gateway</h1>
+            <div class="tagline">multi-provider routing · no-cooldown failover</div>
+        </div>
+        <div class="status-line">
+            <span><span class="live-dot" id="live-dot"></span><span id="gateway-status">connecting…</span></span>
+            <span id="uptime">uptime —</span>
+            <span id="refresh-ts">—</span>
+        </div>
+        <div class="hdr-actions">
+            <button class="btn" id="btn-refresh" aria-label="Refresh all data">Refresh</button>
+            <button class="btn btn-primary" id="btn-add-provider">+ Provider</button>
+        </div>
+    </header>
+
+    <div class="stats-grid" role="region" aria-label="Gateway statistics">
+        <div class="stat-cell"><div class="label">PROVIDERS</div><div class="value" id="st-providers">—</div></div>
+        <div class="stat-cell"><div class="label">ENABLED</div><div class="value" id="st-enabled">—</div></div>
+        <div class="stat-cell"><div class="label">REQUESTS</div><div class="value" id="st-requests">—</div></div>
+        <div class="stat-cell"><div class="label">SUCCESS RATE</div><div class="value" id="st-success">—</div></div>
+        <div class="stat-cell"><div class="label">MEDIAN TTFT</div><div class="value" id="st-ttft">— <small>ms</small></div></div>
+        <div class="stat-cell"><div class="label">GROUPS</div><div class="value" id="st-groups">—</div></div>
+    </div>
+
+    <nav aria-label="Console sections">
+        <div class="tablist" role="tablist" id="tablist">
+            <button class="tab" role="tab" id="tab-providers" aria-controls="panel-providers" aria-selected="true" data-tab="providers">Providers<span class="count" id="tc-providers"></span></button>
+            <button class="tab" role="tab" id="tab-groups" aria-controls="panel-groups" aria-selected="false" data-tab="groups" tabindex="-1">Model Groups<span class="count" id="tc-groups"></span></button>
+            <button class="tab" role="tab" id="tab-routed" aria-controls="panel-routed" aria-selected="false" data-tab="routed" tabindex="-1">Routed Models<span class="count" id="tc-routed"></span></button>
+            <button class="tab" role="tab" id="tab-fallback" aria-controls="panel-fallback" aria-selected="false" data-tab="fallback" tabindex="-1">Fallback Chain</button>
+            <button class="tab" role="tab" id="tab-keys" aria-controls="panel-keys" aria-selected="false" data-tab="keys" tabindex="-1">API Keys<span class="count" id="tc-keys"></span></button>
+            <button class="tab" role="tab" id="tab-logs" aria-controls="panel-logs" aria-selected="false" data-tab="logs" tabindex="-1">Logs<span class="count" id="tc-logs"></span></button>
+        </div>
+    </nav>
+
+    <section class="panel" role="tabpanel" id="panel-providers" aria-labelledby="tab-providers">
+        <div class="panel-toolbar">
+            <div class="tablist" role="group" aria-label="Provider health filter" id="prov-filter" style="border:none;background:transparent;margin:0;">
+                <button class="tab active" data-filter="all">All</button>
+                <button class="tab" data-filter="healthy">Healthy</button>
+                <button class="tab" data-filter="warning">Warning</button>
+                <button class="tab" data-filter="error">Error</button>
+                <button class="tab" data-filter="no-data">No Data</button>
+                <button class="tab" data-filter="disabled">Disabled</button>
+            </div>
+            <div style="display:flex;gap:8px;">
+                <button class="btn" id="btn-refresh-models">Refresh All Models</button>
+            </div>
+        </div>
+        <div id="providers-container"><div class="loading"><div class="spinner"></div>Loading providers…</div></div>
+    </section>
+
+    <section class="panel" role="tabpanel" id="panel-groups" aria-labelledby="tab-groups" hidden>
+        <div class="panel-toolbar">
+            <input type="text" class="picker-search" id="group-search" placeholder="Search groups…" aria-label="Search model groups" style="max-width:260px;margin:0;">
+            <button class="btn btn-primary" id="btn-add-group">+ Model Group</button>
+        </div>
+        <p style="color:var(--text-mute);font-size:11px;margin-bottom:10px;">
+            Model group = the set of providers that serve one logical model; the provider order is the intra-group failover order.
+        </p>
+        <div id="groups-container"><div class="loading"><div class="spinner"></div>Loading groups…</div></div>
+    </section>
+
+    <section class="panel" role="tabpanel" id="panel-routed" aria-labelledby="tab-routed" hidden>
+        <div class="panel-toolbar">
+            <p style="color:var(--text-mute);font-size:11px;">Routed model = a named chain of model groups tried in order when the first fails.</p>
+            <button class="btn btn-primary" id="btn-add-routed">+ Routed Model</button>
+        </div>
+        <div id="routed-container"><div class="loading"><div class="spinner"></div>Loading routed models…</div></div>
+    </section>
+
+    <section class="panel" role="tabpanel" id="panel-fallback" aria-labelledby="tab-fallback" hidden>
+        <div class="panel-toolbar">
+            <p style="color:var(--text-mute);font-size:11px;max-width:640px;">
+                Global chain: when a request for group X fails on all providers, fall back through these groups in order. Keep it short — each link costs its timeouts.
+            </p>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <span id="fc-dirty" class="badge idle" hidden>unsaved</span>
+                <button class="btn btn-primary" id="btn-fc-save">Save Chain</button>
+            </div>
+        </div>
+        <div class="chain-layout">
+            <div class="chain-pane">
+                <div class="pane-head">Available model groups</div>
+                <div class="pane-body">
+                    <input type="text" class="picker-search" id="fc-search" placeholder="Search…" aria-label="Search available groups">
+                    <div id="fc-available"></div>
+                </div>
+            </div>
+            <div class="chain-pane">
+                <div class="pane-head">Fallback order (<span id="fc-count">0</span>)</div>
+                <div class="pane-body" id="fc-chain"><div class="chain-empty">Loading…</div></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="panel" role="tabpanel" id="panel-keys" aria-labelledby="tab-keys" hidden>
+        <div class="panel-toolbar">
+            <p style="color:var(--text-mute);font-size:11px;max-width:640px;">
+                Client keys for <code>/v1/*</code>. Clients pass the key via <code>x-api-key</code> (Anthropic) or <code>Authorization: Bearer</code> (OpenAI). With no keys configured, the gateway is open. Full keys are shown once at creation — store them then.
+            </p>
+            <button class="btn btn-primary" id="btn-add-key">+ New Key</button>
+        </div>
+        <div id="api-keys-container"><div class="loading"><div class="spinner"></div>Loading keys…</div></div>
+    </section>
+
+    <section class="panel" role="tabpanel" id="panel-logs" aria-labelledby="tab-logs" hidden>
+        <div class="panel-toolbar">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <label for="log-result-filter" style="color:var(--text-mute);font-size:11px;">Result</label>
+                <select id="log-result-filter" class="btn" style="padding:4px 8px;">
+                    <option value="all">all</option>
+                    <option value="ok">ok</option>
+                    <option value="exhausted">exhausted</option>
+                </select>
+                <input type="text" id="log-model-filter" placeholder="filter model…" aria-label="Filter logs by model" style="padding:4px 8px;background:var(--bg-inset);border:1px solid var(--line);width:180px;">
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <label class="switch"><input type="checkbox" id="log-auto" checked><span class="track"></span><span class="sw-text">auto</span></label>
+                <button class="btn" id="btn-log-clear">Clear view</button>
+            </div>
+        </div>
+        <div class="log-wrap">
+            <div class="log-scroll">
+                <table class="log-table">
+                    <thead><tr>
+                        <th scope="col">time</th><th scope="col">model</th><th scope="col">providers tried</th>
+                        <th scope="col">result</th><th scope="col">ttft</th><th scope="col">total</th><th scope="col">tok/s</th><th scope="col">stream</th>
+                    </tr></thead>
+                    <tbody id="log-body">
+                        <tr><td colspan="8" class="loading">No requests recorded yet. Send one through /v1/messages and it appears here.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+</div>
+
+<div id="toast-zone" aria-live="polite" role="status"></div>
+
+<div class="modal" id="modal-host" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-content">
+        <div class="modal-head">
+            <h3 id="modal-title">Title</h3>
+            <button class="modal-close" id="modal-x" aria-label="Close dialog">×</button>
+        </div>
+        <div class="modal-body" id="modal-body"></div>
+    </div>
+</div>
+
+<script>
+"use strict";
+
+/* ═══════════ state ═══════════ */
+let metricsData = {};
+let providersData = {};
+let groupsData = {};
+let routedData = {};
+let historyData = {};
+let apiKeysData = {};
+let logsData = [];
+let fallbackOrder = [];
+let fallbackSaved = [];
+let uptimeSecs = 0;
+let currentFilter = "all";
+let groupSearch = "";
+let logsPaused = false;
+let logsClearedUntil = 0;
+let modalCancel = null;
+let fcSearch = "";
+let logFilter = "all";
+let logSearch = "";
+
+const $ = (id) => document.getElementById(id);
+
+/* ═══════════ helpers ═══════════ */
+function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+async function api(path, opts = {}) {
+    const r = await fetch(path, opts);
+    if (!r.ok) {
+        let msg = "";
+        try { msg = await r.text(); } catch (e) { msg = r.statusText; }
+        throw new Error((msg || "").trim() || ("HTTP " + r.status));
+    }
+    const ct = r.headers.get("content-type") || "";
+    return ct.includes("json") ? r.json() : r.text();
+}
+/* provider names may contain '/' (registry ids) — always encode path segments */
+const P = (n) => "/api/providers/" + encodeURIComponent(n);
+const G = (n) => "/api/model-groups/" + encodeURIComponent(n);
+const R = (n) => "/api/routed-models/" + encodeURIComponent(n);
+
+function toast(msg, kind) {
+    const el = document.createElement("div");
+    el.className = "toast " + (kind || "");
+    el.textContent = msg;
+    $("toast-zone").appendChild(el);
+    setTimeout(() => el.remove(), kind === "err" ? 6000 : 3200);
+}
+
+function openModal(title, bodyHtml, onMount) {
+    modalCancel = null;
+    $("modal-title").textContent = title;
+    $("modal-body").innerHTML = bodyHtml;
+    $("modal-host").classList.add("active");
+    const f = $("modal-body").querySelector("input,select,textarea,button");
+    if (f) f.focus();
+    if (onMount) onMount();
+}
+function closeModal() {
+    const cb = modalCancel;
+    modalCancel = null;
+    $("modal-host").classList.remove("active");
+    $("modal-body").innerHTML = "";
+    if (cb) cb();
+}
+/* themed confirm (replaces native confirm; Esc/backdrop = cancel) */
+function askConfirm(title, message, actionLabel) {
+    return new Promise((resolve) => {
+        let settled = false;
+        const finish = (v) => { if (!settled) { settled = true; modalCancel = null; $("modal-host").classList.remove("active"); $("modal-body").innerHTML = ""; resolve(v); } };
+        openModal(title,
+            `<p style="margin-bottom:16px;">${esc(message)}</p>
+             <div class="form-actions">
+                 <button class="btn" id="cf-no">Cancel</button>
+                 <button class="btn btn-danger" id="cf-yes">${esc(actionLabel)}</button>
+             </div>`,
+            () => {
+                modalCancel = () => finish(false);
+                $("cf-no").onclick = () => finish(false);
+                $("cf-yes").onclick = () => finish(true);
+                $("cf-yes").focus();
+            });
+    });
+}
+
+function fmtUptime(s) {
+    if (s == null) return "—";
+    const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+    if (d) return d + "d " + h + "h " + m + "m";
+    if (h) return h + "h " + m + "m";
+    return m + "m " + Math.floor(s % 60) + "s";
+}
+
+/* ═══════════ data ═══════════ */
+async function refreshAll() {
+    try {
+        const [m, p, g, r, h, k] = await Promise.all([
+            api("/metrics"), api("/api/providers"),
+            api("/api/model-groups"), api("/api/routed-models"),
+            api("/api/metrics/history"), api("/api/api-keys"),
+        ]);
+        metricsData = m || {}; providersData = p || {}; groupsData = g || {};
+        routedData = r || {}; historyData = h || {}; apiKeysData = k || {};
+        $("gateway-status").textContent = "online";
+        $("live-dot").classList.remove("down");
+        $("refresh-ts").textContent = "updated " + new Date().toLocaleTimeString();
+        /* don't clobber the DOM (or an open form) while a dialog is up */
+        if (!$("modal-host").classList.contains("active")) {
+            renderStats();
+            renderProviders();
+            renderGroups();
+            renderRouted();
+            renderApiKeys();
+            updateTabCounts();
+        }
+    } catch (e) {
+        $("gateway-status").textContent = "offline — gateway unreachable";
+        $("live-dot").classList.add("down");
+        toast("Refresh failed: " + e.message, "err");
+    }
+}
+
+function renderStats() {
+    const provs = Object.values(providersData);
+    $("st-providers").textContent = provs.length;
+    $("st-enabled").textContent = provs.filter(p => p.enabled !== false).length + "/" + provs.length;
+    const mets = Object.values(metricsData);
+    const totalReq = mets.reduce((a, m) => a + (m.total_requests || 0), 0);
+    const totalSucc = mets.reduce((a, m) => a + (m.success_count || 0), 0);
+    $("st-requests").textContent = totalReq.toLocaleString();
+    $("st-success").textContent = totalReq ? ((totalSucc / totalReq) * 100).toFixed(1) + "%" : "—";
+    const ttfts = mets.map(m => m.median_ttft_ms).filter(v => typeof v === "number");
+    $("st-ttft").innerHTML = ttfts.length
+        ? Math.round(ttfts.reduce((a, b) => a + b, 0) / ttfts.length) + ' <small>ms</small>'
+        : "—";
+    $("st-groups").textContent = Object.keys(groupsData).length;
+}
+function updateTabCounts() {
+    $("tc-providers").textContent = "(" + Object.keys(providersData).length + ")";
+    $("tc-groups").textContent = "(" + Object.keys(groupsData).length + ")";
+    $("tc-routed").textContent = "(" + Object.keys(routedData).length + ")";
+    $("tc-keys").textContent = "(" + (((apiKeysData && apiKeysData.api_keys) || []).length) + ")";
+    $("tc-logs").textContent = "(" + logsData.length + ")";
+}
+
+/* ═══════════ providers ═══════════ */
+function provStatus(m) {
+    if (!m || !m.total_requests) return "no-data";
+    if (m.success_rate >= 0.95) return "healthy";
+    if (m.success_rate >= 0.8) return "warning";
+    return "error";
+}
+/* status always pairs a colour with a glyph + word (never colour alone) */
+function statusBadge(status) {
+    const map = {
+        healthy: ["ok", "✓ healthy"], warning: ["warn", "⚠ warning"],
+        error: ["err", "✕ error"], "no-data": ["idle", "○ no data"],
+        disabled: ["off", "⊘ disabled"],
+    };
+    const [cls, label] = map[status] || map["no-data"];
+    return `<span class="badge ${cls}">${label}</span>`;
+}
+
+function sparkline(points) {
+    if (!points || points.length < 2) return "";
+    const recent = points.slice(-60);
+    const w = recent.length * 3, h = 16;
+    let rects = "";
+    recent.forEach((pt, i) => {
+        const bh = pt.ok ? h : h * 0.6;
+        rects += `<rect x="${i * 3}" y="${h - bh}" width="2" height="${bh}" fill="${pt.ok ? "var(--ok)" : "var(--err)"}">` +
+            `<title>${esc(new Date(pt.ts_ms).toLocaleTimeString())} · ${pt.ok ? "success" : "fail"}${pt.ttft_ms ? " · ttft " + pt.ttft_ms + "ms" : ""}</title></rect>`;
+    });
+    return `<svg width="${w}" height="${h}" role="img" aria-label="recent request history">${rects}</svg>`;
+}
+
+function renderProviders() {
+    const names = [...new Set([...Object.keys(providersData), ...Object.keys(metricsData)])].sort();
+    let items = names.map((name) => {
+        const config = providersData[name] || {};
+        const metrics = metricsData[name] || {};
+        const enabled = config.enabled !== false;
+        return { name, config, metrics, enabled, status: enabled ? provStatus(metrics) : "disabled" };
+    });
+    if (currentFilter === "disabled") items = items.filter(p => !p.enabled);
+    else if (currentFilter !== "all") items = items.filter(p => p.status === currentFilter);
+
+    const cont = $("providers-container");
+    if (!items.length) {
+        cont.innerHTML = `<div class="empty-state">No providers in this view.<br><br>${currentFilter !== "all" ? "Change the filter above, or " : ""}add one with <b>+ Provider</b> in the header.</div>`;
+        updateTabCounts();
+        return;
+    }
+    cont.innerHTML = `<div class="provider-grid">` + items.map(({ name, config, metrics, status, enabled }) => {
+        const req = metrics.total_requests || 0;
+        const succ = req ? (metrics.success_rate * 100).toFixed(1) + "%" : "—";
+        const ttft = metrics.median_ttft_ms ? metrics.median_ttft_ms + "ms" : "—";
+        const spd = metrics.median_generation_speed_tps ? metrics.median_generation_speed_tps.toFixed(0) + " t/s" : "—";
+        return `
+        <div class="provider-card${enabled ? "" : " disabled-card"}" data-provider="${esc(name)}">
+            <div class="pc-head">
+                <div style="min-width:0">
+                    <div class="pc-name" title="${esc(name)}">${esc(name)}</div>
+                    <div class="pc-url">${esc(config.base_url || "base URL not set")}</div>
+                    <div class="pc-key">${esc(config.api_key || "")}</div>
+                </div>
+                ${statusBadge(status)}
+            </div>
+            <div class="pc-stats">
+                <div class="pc-stat"><div class="l">REQ</div><div class="v">${req}</div></div>
+                <div class="pc-stat"><div class="l">OK</div><div class="v">${succ}</div></div>
+                <div class="pc-stat"><div class="l">TTFT</div><div class="v">${ttft}</div></div>
+                <div class="pc-stat"><div class="l">SPEED</div><div class="v">${spd}</div></div>
+            </div>
+            <div class="pc-foot">
+                <label class="switch" title="Include this provider in routing">
+                    <input type="checkbox" class="js-enable" ${enabled ? "checked" : ""} aria-label="Enable provider ${esc(name)}">
+                    <span class="track"></span><span class="sw-text">${enabled ? "on" : "off"}</span>
+                </label>
+                <button class="btn btn-sm js-edit">Edit</button>
+                <button class="btn btn-sm js-test">Test</button>
+                <button class="btn btn-sm js-models">Refresh models</button>
+                <button class="btn btn-sm js-config">Set models</button>
+                <button class="btn btn-sm btn-danger js-del">Delete</button>
+                <span class="pc-spark">${sparkline(historyData[name])}</span>
+            </div>
+        </div>`;
+    }).join("") + `</div>`;
+    updateTabCounts();
+}
+
+async function toggleProvider(name, enabled) {
+    try {
+        await api(P(name) + "/enabled", {
+            method: "PATCH", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ enabled }),
+        });
+        toast('Provider "' + name + '" ' + (enabled ? "enabled" : "disabled"), "ok");
+    } catch (e) {
+        toast("Toggle failed: " + e.message, "err");
+    }
+    refreshAll();
+}
+
+/* ═══════════ provider forms ═══════════ */
+function openProviderModal(name) {
+    const isNew = !name;
+    const p = providersData[name] || {};
+    openModal(isNew ? "Add Provider" : "Edit Provider: " + name, `
+    <form id="prov-form">
+        ${isNew ? `<div class="form-group"><label for="pf-name">Provider name</label>
+            <input id="pf-name" required placeholder="e.g. my-proxy">
+            <div class="help">Registry-backed names (openai, groq, …) inherit their base URL automatically.</div></div>` : ""}
+        <div class="form-group"><label for="pf-url">Base URL</label>
+            <input id="pf-url" value="${esc(p.base_url || "")}" placeholder="https://api.example.com/v1"></div>
+        <div class="form-group"><label for="pf-key">API Key${isNew ? "" : " (leave blank to keep current)"}</label>
+            <input id="pf-key" type="password" placeholder="${isNew ? "sk-…" : "••••••••••"}" autocomplete="off">
+            <div class="help">Keys are write-only — stored in config/crsllm.toml, never shown in full here.</div></div>
+        <div class="form-row">
+            <div class="form-group"><label for="pf-type">Type</label>
+                <select id="pf-type"><option value="">unset</option><option value="free">free</option><option value="paid">paid</option><option value="custom">custom</option></select></div>
+            <div class="form-group"><label for="pf-prio">Priority (lower = tried first)</label>
+                <input id="pf-prio" type="number" value="${p.priority ?? ""}"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label for="pf-ttft">TTFT timeout (ms)</label><input id="pf-ttft" type="number" value="${p.ttft_timeout_ms ?? 60000}"></div>
+            <div class="form-group"><label for="pf-gen">Generation timeout (ms)</label><input id="pf-gen" type="number" value="${p.generation_timeout_ms ?? 90000}"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label for="pf-total">Total budget (ms)</label><input id="pf-total" type="number" value="${p.total_timeout_ms ?? 240000}"></div>
+            <div class="form-group"><label for="pf-conn">Connect timeout (ms)</label><input id="pf-conn" type="number" value="${p.connect_timeout_ms ?? 8000}"></div>
+        </div>
+        <div class="form-actions">
+            <button type="button" class="btn" id="pf-cancel">Cancel</button>
+            <button type="submit" class="btn btn-primary">${isNew ? "Create provider" : "Save changes"}</button>
+        </div>
+    </form>`, () => {
+        if (!isNew && p.provider_type) $("pf-type").value = p.provider_type;
+        $("pf-cancel").onclick = closeModal;
+        $("prov-form").onsubmit = async (e) => {
+            e.preventDefault();
+            const body = {
+                base_url: $("pf-url").value.trim(),
+                connect_timeout_ms: +$("pf-conn").value || 8000,
+                ttft_timeout_ms: +$("pf-ttft").value || 60000,
+                generation_timeout_ms: +$("pf-gen").value || 90000,
+                total_timeout_ms: +$("pf-total").value || 240000,
+            };
+            const key = $("pf-key").value;
+            if (key) body.api_key = key;
+            if ($("pf-type").value) body.provider_type = $("pf-type").value;
+            if ($("pf-prio").value !== "") body.priority = +$("pf-prio").value;
+            try {
+                if (isNew) {
+                    if (!key) { toast("API key required for a new provider", "err"); return; }
+                    body.name = $("pf-name").value.trim();
+                    await api("/api/providers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+                    toast('Provider "' + body.name + '" created', "ok");
+                } else {
+                    await api(P(name), { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+                    toast('Provider "' + name + '" saved', "ok");
+                }
+                closeModal(); refreshAll();
+            } catch (err) { toast(err.message, "err"); }
+        };
+    });
+}
+
+async function testProvider(name) {
+    toast('Testing "' + name + '"…');
+    try {
+        const res = await api(P(name) + "/test", { method: "POST" });
+        if (res.status === "connected") toast('✓ "' + name + '" connected · ' + res.latency_ms + "ms · " + res.model_count + " models", "ok");
+        else toast('✕ "' + name + '" failed: ' + (res.error || "no response"), "err");
+    } catch (e) { toast("Test failed: " + e.message, "err"); }
+}
+
+async function refreshProviderModels(name) {
+    toast('Refreshing models of "' + name + '"…');
+    try {
+        const res = await api(P(name) + "/refresh", { method: "POST" });
+        toast('✓ "' + name + '": ' + (res.model_count ?? (res.models ? res.models.length : "?")) + " models", "ok");
+        refreshAll();
+    } catch (e) { toast("Refresh failed: " + e.message, "err"); }
+}
+
+async function openModelsModal(name) {
+    let models = [];
+    try { models = (await api("/api/discovered-models"))[name] || []; } catch (e) { /* fall back to empty */ }
+    openModal("Set models: " + name, `
+        <p style="font-size:11px;color:var(--text-dim);margin-bottom:10px;">
+            Models served by "${esc(name)}" — one per line. Overrides auto-discovery for this provider.</p>
+        <div class="form-group"><label for="models-ta">Model IDs</label>
+            <textarea id="models-ta" rows="14" spellcheck="false">${esc(models.join("\n"))}</textarea></div>
+        <div class="form-actions">
+            <button class="btn" id="mm-cancel">Cancel</button>
+            <button class="btn btn-primary" id="mm-save">Save models</button>
+        </div>`, () => {
+        $("mm-cancel").onclick = closeModal;
+        $("mm-save").onclick = async () => {
+            const list = $("models-ta").value.split("\n").map(s => s.trim()).filter(Boolean);
+            try {
+                await api(P(name) + "/models", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ models: list }) });
+                toast("✓ " + list.length + ' models saved for "' + name + '"', "ok");
+                closeModal(); refreshAll();
+            } catch (e) { toast("Save failed: " + e.message, "err"); }
+        };
+    });
+}
+
+/* ═══════════ model groups ═══════════ */
+const allGroupNames = () => Object.keys(groupsData).sort((a, b) => a.localeCompare(b));
+
+function renderGroups() {
+    const cont = $("groups-container");
+    const names = allGroupNames();
+    if (!names.length) {
+        cont.innerHTML = `<div class="empty-state">No model groups yet.<br>Use <b>Refresh All Models</b> in the Providers tab to auto-discover them, or create one with <b>+ Model Group</b>.</div>`;
+        return;
+    }
+    const q = groupSearch.toLowerCase();
+    const filtered = q ? names.filter(n => n.toLowerCase().includes(q)) : names;
+    const manual = filtered.filter(n => !groupsData[n].auto_generated);
+    const auto = filtered.filter(n => groupsData[n].auto_generated);
+    const rowHtml = (name, g) => `
+        <div class="row" data-group="${esc(name)}">
+            <div class="r-main">
+                <span class="r-name">${esc(name)}</span>
+                ${g.auto_generated ? '<span class="badge idle" style="margin-left:8px;">auto</span>' : ""}
+                <div class="r-chips">
+                    ${(g.providers || []).map((pr, i) => `<span class="chip"><span class="ord">#${i + 1}</span>${esc(pr.provider)}${pr.model_id ? ":" + esc(pr.model_id) : ""}</span><span class="arrow">→</span>`).join("") || '<span class="chain-empty">no providers</span>'}
+                </div>
+            </div>
+            <div class="r-actions">
+                ${g.auto_generated ? '<button class="btn btn-sm js-promote">Adopt as manual</button>' : `
+                    <button class="btn btn-sm js-edit-group">Edit</button>
+                    <button class="btn btn-sm btn-danger js-del-group">Delete</button>`}
+            </div>
+        </div>`;
+    cont.innerHTML =
+        (manual.length ? `<div class="section-label">MANUAL (${manual.length})</div>` + manual.map(n => rowHtml(n, groupsData[n])).join("") : "") +
+        (auto.length ? `<div class="section-label">AUTO-GENERATED (${auto.length}${!q && auto.length > 80 ? " · showing 80" : ""})</div>` + auto.slice(0, 80).map(n => rowHtml(n, groupsData[n])).join("") : "") ||
+        '<div class="empty-state">No groups match "' + esc(groupSearch) + '"</div>';
+}
+
+function groupEditorHtml(presetName, chosen) {
+    const provs = Object.keys(providersData).sort();
+    const chosenMap = Object.fromEntries((chosen || []).map(pr => [pr.provider, pr.model_id || ""]));
+    return `
+    <div class="form-group"><label for="ge-name">Group name (logical model id clients call)</label>
+        <input id="ge-name" value="${esc(presetName || "")}" placeholder="e.g. deepseek-v4-flash"></div>
+    <div class="section-label" style="margin-top:4px;">Providers — check to include; order = failover priority (checked first wins lowest #)</div>
+    <input type="text" class="picker-search" id="ge-search" placeholder="Search providers…" aria-label="Search providers">
+    <div style="max-height:340px;overflow-y:auto;border:1px solid var(--line);padding:8px;" id="ge-list">
+        ${provs.map(pn => {
+            const on = pn in chosenMap;
+            return `<div class="chain-list-item" data-pname="${esc(pn)}">
+                <label class="picker-label" style="flex:1;"><input type="checkbox" class="ge-check" ${on ? "checked" : ""}> ${esc(pn)}</label>
+                <input type="text" class="ge-mid" value="${esc(chosenMap[pn] || "")}" placeholder="model_id override" aria-label="model_id override for ${esc(pn)}" style="width:170px;padding:3px 6px;background:var(--bg-raised);border:1px solid var(--line);font-size:11px;">
+                <span class="ge-ord pos"></span>
+            </div>`;
+        }).join("") || '<div class="chain-empty">No configured providers — add one first.</div>'}
+    </div>
+    <div class="form-actions">
+        <button class="btn" id="ge-cancel">Cancel</button>
+        <button class="btn btn-primary" id="ge-save">Save group</button>
+    </div>`;
+}
+
+function wireGroupEditor(existingProviders, editName) {
+    const order = (existingProviders || []).map(pr => pr.provider);
+    const refreshOrdinals = () => {
+        document.querySelectorAll("#ge-list .chain-list-item").forEach(el => {
+            const cb = el.querySelector(".ge-check");
+            el.querySelector(".ge-ord").textContent = cb.checked ? (order.indexOf(el.dataset.pname) + 1) : "";
+        });
+    };
+    document.querySelectorAll("#ge-list .ge-check").forEach(cb => {
+        cb.onchange = () => {
+            const pn = cb.closest(".chain-list-item").dataset.pname;
+            if (cb.checked) { if (!order.includes(pn)) order.push(pn); }
+            else { const i = order.indexOf(pn); if (i >= 0) order.splice(i, 1); }
+            refreshOrdinals();
+        };
+    });
+    $("ge-search").oninput = () => {
+        const s = $("ge-search").value.toLowerCase();
+        document.querySelectorAll("#ge-list .chain-list-item").forEach(el => {
+            el.style.display = el.dataset.pname.toLowerCase().includes(s) ? "" : "none";
+        });
+    };
+    $("ge-cancel").onclick = closeModal;
+    $("ge-save").onclick = async () => {
+        const providers = order.map(pn => {
+            const el = document.querySelector('#ge-list [data-pname="' + CSS.escape(pn) + '"]');
+            const mid = el.querySelector(".ge-mid").value.trim();
+            return mid ? { provider: pn, model_id: mid } : { provider: pn };
+        });
+        if (!providers.length) { toast("Pick at least one provider", "err"); return; }
+        try {
+            if (editName) {
+                await api(G(editName), { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ providers }) });
+                toast('Group "' + editName + '" saved', "ok");
+            } else {
+                const gname = $("ge-name").value.trim();
+                if (!gname) { toast("Group name required", "err"); return; }
+                await api("/api/model-groups", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: gname, providers }) });
+                toast('Group "' + gname + '" created', "ok");
+            }
+            closeModal(); refreshAll();
+        } catch (e) { toast(e.message, "err"); }
+    };
+    refreshOrdinals();
+}
+
+/* editName given → PUT existing; presetName given → create prefilled (adopt) */
+function openGroupModal(editName, existing, presetName) {
+    openModal(editName ? "Edit group: " + editName : (presetName ? "Adopt group: " + presetName : "Add Model Group"),
+        groupEditorHtml(presetName, existing),
+        () => wireGroupEditor(existing, editName));
+}
+
+/* ═══════════ routed models ═══════════ */
+function routedChain(name) {
+    const v = routedData[name];
+    return (v && v.chain) || (Array.isArray(v) ? v : []);
+}
+function renderRouted() {
+    const cont = $("routed-container");
+    const names = Object.keys(routedData).sort((a, b) => a.localeCompare(b));
+    if (!names.length) {
+        cont.innerHTML = '<div class="empty-state">No routed models. Routed models map one client-facing name to an ordered chain of model groups.<br>Click <b>+ Routed Model</b> to create one.</div>';
+        return;
+    }
+    cont.innerHTML = names.map(name => {
+        const chain = routedChain(name);
+        return `
+        <div class="row" data-routed="${esc(name)}">
+            <div class="r-main">
+                <span class="r-name">${esc(name)}</span>
+                <div class="r-chips">${chain.length
+                    ? chain.map((g, i) => `<span class="chip"><span class="ord">#${i + 1}</span>${esc(g)}</span><span class="arrow">→</span>`).join("")
+                    : '<span class="chain-empty">empty chain</span>'}</div>
+            </div>
+            <div class="r-actions">
+                <button class="btn btn-sm js-edit-routed">Edit chain</button>
+                <button class="btn btn-sm btn-danger js-del-routed">Delete</button>
+            </div>
+        </div>`;
+    }).join("");
+}
+
+/* ═══════════ api keys ═══════════ */
+async function copyText(t) {
+    try {
+        await navigator.clipboard.writeText(t);
+        toast("Copied to clipboard", "ok");
+    } catch (e) {
+        const ta = document.createElement("textarea");
+        ta.value = t;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand("copy"); toast("Copied to clipboard", "ok"); }
+        catch (e2) { toast("Copy failed — select and copy manually", "warn", 5000); }
+        ta.remove();
+    }
+}
+
+function renderApiKeys() {
+    const cont = $("api-keys-container");
+    if (!cont) return;
+    const keys = (apiKeysData && apiKeysData.api_keys) || [];
+    if (!keys.length) {
+        cont.innerHTML = '<div class="empty-state">No API keys — <code>/v1/*</code> is open to any client.<br>Create a key to require authentication. Clients pass it as <code>x-api-key</code> (Anthropic) or <code>Authorization: Bearer</code> (OpenAI).<br>Click <b>+ New Key</b> to create one.</div>';
+        return;
+    }
+    cont.innerHTML = keys.map(k => `
+        <div class="row">
+            <div class="r-main">
+                <span class="r-name">${esc(k.key)}</span>
+            </div>
+            <div class="r-actions">
+                <button class="btn btn-sm btn-danger js-del-key" data-key="${esc(k.key)}">Delete</button>
+            </div>
+        </div>
+    `).join("");
+    cont.querySelectorAll(".js-del-key").forEach(btn => {
+        btn.onclick = () => deleteApiKey(btn.dataset.key);
+    });
+}
+
+/* Rows carry only the masked key; the backend DELETE also matches by mask,
+   so keys created in earlier sessions remain deletable. */
+
+async function showCreateApiKeyModal() {
+    openModal("New API Key",
+        `<div class="form-group">
+            <label for="ak-input">Key</label>
+            <input id="ak-input" type="text" placeholder="leave empty to auto-generate crsllm-…" autocomplete="off" spellcheck="false">
+            <div class="help">Custom keys are allowed; auto-generated keys look like <code>crsllm-&lt;uuid&gt;</code>.</div>
+        </div>
+        <div class="form-actions">
+            <button class="btn" id="ak-cancel">Cancel</button>
+            <button class="btn btn-primary" id="ak-create">Create Key</button>
+        </div>`,
+        () => {
+            $("ak-cancel").onclick = closeModal;
+            $("ak-create").onclick = async () => {
+                try {
+                    const res = await api("/api/api-keys", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ key: $("ak-input").value.trim() || "" }),
+                    });
+                    closeModal();
+                    showCreatedKey(res.full_key);
+                    await refreshAll();
+                } catch (e) { toast("Failed to create API key: " + e.message, "err", 5000); }
+            };
+        });
+}
+
+/* One-time disclosure of the full key with copy button — never stored again. */
+function showCreatedKey(fullKey) {
+    openModal("API Key Created",
+        `<p style="margin-bottom:10px;">Copy this key now — it is <b>shown only once</b>. The gateway stores it in <code>config/crsllm.toml</code>, but the console never displays it again.</p>
+         <div class="form-group"><label for="ak-full">Full key</label>
+            <div style="display:flex;gap:8px;">
+                <input id="ak-full" readonly value="${esc(fullKey)}" style="flex:1;font-family:var(--mono);">
+                <button class="btn btn-primary" id="ak-copy">Copy</button>
+            </div>
+         </div>
+         <p style="color:var(--text-mute);font-size:11px;margin-top:10px;">Codex/Claude: use as <code>ANTHROPIC_API_KEY</code> with base URL <code>http://&lt;this host&gt;:${location.port || "3002"}</code>.</p>
+         <div class="form-actions"><button class="btn" id="ak-done">Done</button></div>`,
+        () => {
+            $("ak-copy").onclick = () => copyText(fullKey);
+            $("ak-done").onclick = closeModal;
+        });
+}
+
+async function deleteApiKey(masked) {
+    if (!await askConfirm("Delete API Key", "Delete key " + masked + "? Requests using it will be rejected immediately.", "Delete")) return;
+    try {
+        await api("/api/api-keys/" + encodeURIComponent(masked), { method: "DELETE" });
+        toast("API key deleted", "ok");
+        refreshAll();
+    } catch (e) {
+        toast("Failed to delete API key: " + e.message, "err", 5000);
+    }
+}
+
+function chainPickerHtml(selected) {
+    const gn = allGroupNames();
+    const sel = selected || [];
+    const remaining = gn.filter(g => !sel.includes(g));
+    const li = (g, inChain) => `<div class="chain-list-item" data-g="${esc(g)}">
+        <button class="btn btn-sm ${inChain ? "" : "btn-primary"} js-chain-${inChain ? "remove" : "add"}" title="${inChain ? "Remove from chain" : "Append to chain"}">${inChain ? "−" : "+"}</button>
+        <span class="g">${esc(g)}</span></div>`;
+    return `
+    <div class="form-group" id="cp-name-wrap"><label for="cp-name">Routed model name</label>
+        <input id="cp-name" placeholder="e.g. smart" value=""></div>
+    <div class="two-pane">
+        <div><div class="section-label">AVAILABLE GROUPS</div>
+            <input type="text" class="picker-search" id="cp-search" placeholder="Search groups…" aria-label="Search groups">
+            <div class="pane-box" id="cp-avail">${remaining.map(g => li(g, false)).join("") || '<div class="chain-empty">no groups available</div>'}</div></div>
+        <div><div class="section-label">CHAIN (top = first)</div>
+            <div class="pane-box" id="cp-chain">${sel.map(g => li(g, true)).join("") || '<div class="chain-empty">pick groups from the left</div>'}</div></div>
+    </div>
+    <div class="form-actions">
+        <button class="btn" id="cp-cancel">Cancel</button>
+        <button class="btn btn-primary" id="cp-save">Save routed model</button>
+    </div>`;
+}
+
+function wireChainPicker(editName, initialChain) {
+    const chain = [...(initialChain || [])];
+    const render = () => {
+        const avail = $("cp-avail"), ch = $("cp-chain");
+        const items = (list, inChain) => {
+            const s = (list === avail && $("cp-search")) ? $("cp-search").value.toLowerCase() : "";
+            const src = inChain ? chain : allGroupNames().filter(g => !chain.includes(g) && g.toLowerCase().includes(s));
+            list.innerHTML = src.map(g => `<div class="chain-list-item" data-g="${esc(g)}">
+                <button class="btn btn-sm ${inChain ? "" : "btn-primary"} js-chain-${inChain ? "remove" : "add"}">${inChain ? "−" : "+"}</button>
+                <span class="g">${esc(g)}</span>
+                ${inChain ? `<span class="ord">${chain.indexOf(g) + 1}</span>
+                    <button class="btn btn-sm js-chain-up" title="Move up">↑</button>
+                    <button class="btn btn-sm js-chain-down" title="Move down">↓</button>` : ""}
+            </div>`).join("")
+                || '<div class="chain-empty">' + (inChain ? "pick groups from the left" : "no groups available") + "</div>";
+        };
+        items(avail, false); items(ch, true);
+    };
+    // delegated on modal host: content is replaced on each modal close, so stale handlers die with old nodes
+    $("cp-avail").onclick = $("cp-chain").onclick = (e) => {
+        const btn = e.target.closest("button");
+        const item = e.target.closest(".chain-list-item");
+        if (!btn || !item) return;
+        const g = item.dataset.g;
+        if (btn.classList.contains("js-chain-add")) { if (!chain.includes(g)) chain.push(g); }
+        else if (btn.classList.contains("js-chain-remove")) { chain.splice(chain.indexOf(g), 1); }
+        else if (btn.classList.contains("js-chain-up")) { const i = chain.indexOf(g); if (i > 0) { chain.splice(i - 1, 0, chain.splice(i, 1)[0]); } }
+        else if (btn.classList.contains("js-chain-down")) { const i = chain.indexOf(g); if (i < chain.length - 1) { chain.splice(i + 1, 0, chain.splice(i, 1)[0]); } }
+        else return;
+        render();
+    };
+    $("cp-search").oninput = render;
+    $("cp-cancel").onclick = closeModal;
+    $("cp-save").onclick = async () => {
+        if (!chain.length) { toast("Chain must contain at least one group", "err"); return; }
+        const payload = JSON.stringify({ chain });
+        try {
+            if (editName) {
+                await api(R(editName), { method: "PUT", headers: { "Content-Type": "application/json" }, body: payload });
+                toast('Routed model "' + editName + '" saved', "ok");
+            } else {
+                const name = $("cp-name").value.trim();
+                if (!name) { toast("Routed model name required", "err"); return; }
+                await api("/api/routed-models", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, chain }) });
+                toast('Routed model "' + name + '" created', "ok");
+            }
+            closeModal(); refreshAll();
+        } catch (e) { toast(e.message, "err"); }
+    };
+    if (editName) { $("cp-name").value = editName; $("cp-name-wrap").style.display = "none"; }
+    render();
+}
+
+function openRoutedModal(editName) {
+    const cur = editName ? routedChain(editName) : [];
+    openModal(editName ? "Edit routed model: " + editName : "Add Routed Model",
+        chainPickerHtml(cur),
+        () => wireChainPicker(editName, cur));
+}
+
+/* ═══════════ fallback chain editor ═══════════ */
+let fcAvailable = [], fcChain = [], fcLoadedRaw = "";
+
+async function loadFallbackChain() {
+    const res = await api("/api/fallback-chain");
+    const known = new Set(allGroupNames());
+    const raw = res.order || [];
+    /* stale entries (group deleted/renamed) can never route — drop them so Save isn't blocked */
+    const stale = raw.filter(g => !known.has(g));
+    fcChain = raw.filter(g => known.has(g));
+    if (stale.length) toast("Dropped unknown groups from chain: " + stale.join(", "), "warn");
+    /* available = every group the router can resolve: manual + auto-generated */
+    fcAvailable = allGroupNames();
+    fcLoadedRaw = JSON.stringify(fcChain);
+    renderFallbackEditor();
+}
+
+function renderFallbackEditor() {
+    $("fc-count").textContent = fcChain.length;
+    const dirty = JSON.stringify(fcChain) !== fcLoadedRaw;
+    $("fc-dirty").hidden = !dirty;
+    const s = fcSearch.toLowerCase();
+    const rem = fcAvailable.filter(g => !fcChain.includes(g) && (!s || g.toLowerCase().includes(s)));
+    $("fc-available").innerHTML = rem.map(g => `
+        <div class="chain-list-item" data-g="${esc(g)}"><button class="btn btn-sm btn-primary js-fc-add">+</button><span class="g">${esc(g)}</span></div>`).join("")
+        || '<div class="chain-empty">nothing left to add' + (s ? ' for "' + esc(fcSearch) + '"' : "") + "</div>";
+    $("fc-chain").innerHTML = fcChain.map((g, i) => `
+        <div class="chain-list-item" data-g="${esc(g)}">
+            <button class="btn btn-sm js-fc-remove" title="Remove">−</button>
+            <span class="g">${esc(g)}</span>
+            <span class="ord">${i + 1}</span>
+            <button class="btn btn-sm js-fc-up" ${i === 0 ? "disabled" : ""} title="Move up">↑</button>
+            <button class="btn btn-sm js-fc-down" ${i === fcChain.length - 1 ? "disabled" : ""} title="Move down">↓</button>
+        </div>`).join("") || '<div class="chain-empty">no fallback yet — clients get a 404 for unknown models</div>';
+}
+
+function saveFallbackChain() {
+    api("/api/fallback-chain", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ order: fcChain }) })
+        .then(() => { fcLoadedRaw = JSON.stringify(fcChain); renderFallbackEditor(); renderStats(); toast("✓ Fallback chain saved", "ok"); })
+        .catch(e => toast(e.message, "err"));
+}
+
+$("fc-available").addEventListener("click", e => {
+    const b = e.target.closest(".js-fc-add"); if (!b) return;
+    fcChain.push(b.closest(".chain-list-item").dataset.g); renderFallbackEditor();
+});
+$("fc-chain").addEventListener("click", e => {
+    const item = e.target.closest(".chain-list-item"); if (!item) return;
+    const g = item.dataset.g, i = fcChain.indexOf(g);
+    if (e.target.closest(".js-fc-remove")) fcChain.splice(i, 1);
+    else if (e.target.closest(".js-fc-up") && i > 0) { fcChain.splice(i - 1, 0, fcChain.splice(i, 1)[0]); }
+    else if (e.target.closest(".js-fc-down") && i < fcChain.length - 1) { fcChain.splice(i + 1, 0, fcChain.splice(i, 1)[0]); }
+    else return;
+    renderFallbackEditor();
+});
+$("btn-fc-save").onclick = saveFallbackChain;
+$("fc-search").oninput = () => { fcSearch = $("fc-search").value.trim(); renderFallbackEditor(); };
+
+/* ═══════════ request logs ═══════════ */
+function fmtTs(ms) {
+    const d = new Date(ms);
+    const p = n => String(n).padStart(2, "0");
+    return p(d.getMonth() + 1) + "-" + p(d.getDate()) + " " + p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
+}
+function fmtDur(ms) {
+    if (ms == null) return "—";
+    if (ms < 1000) return Math.round(ms) + "ms";
+    if (ms < 60000) return (ms / 1000).toFixed(1) + "s";
+    return Math.floor(ms / 60000) + "m" + String(Math.round((ms % 60000) / 1000)).padStart(2, "0") + "s";
+}
+function resultBadge(r) {
+    if (r === "ok") return '<span class="result-badge ok">ok</span>';
+    if (r === "exhausted") return '<span class="result-badge exh">exhausted</span>';
+    return '<span class="result-badge err">' + esc(r || "?") + "</span>";
+}
+function renderLogs(logs) {
+    logsData = logs;
+    const tbody = $("log-body");
+    const s = logSearch.toLowerCase();
+    let rows = logs.filter(l =>
+        (logFilter === "all" || l.result === logFilter) &&
+        (!s || (l.model || "").toLowerCase().includes(s) || (l.chain || []).join(",").toLowerCase().includes(s)) &&
+        (logsClearedUntil === 0 || l.ts_ms > logsClearedUntil));
+    if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="8" class="empty-state" style="padding:28px;">' +
+            (logs.length ? "No logs match the current filters." : "No requests yet — traffic through /v1/chat/completions or /v1/messages appears here in real time.") + "</td></tr>";
+        return;
+    }
+    tbody.innerHTML = rows.slice(0, 300).map(l => `
+        <tr>
+            <td class="ts">${fmtTs(l.ts_ms)}</td>
+            <td>${esc(l.model || "—")}</td>
+            <td class="log-chain">${(l.chain || []).map(esc).join(" → ") || "—"}</td>
+            <td>${resultBadge(l.result)}${l.error ? `<div class="log-err" title="${esc(l.error)}">${esc(l.error)}</div>` : ""}</td>
+            <td style="text-align:right;">${l.ttft_ms != null ? Math.round(l.ttft_ms) : "—"}</td>
+            <td style="text-align:right;">${fmtDur(l.total_ms)}</td>
+            <td style="text-align:right;">${(l.total_ms && l.output_tokens) ? (l.output_tokens / (l.total_ms / 1000)).toFixed(1) : "—"}</td>
+            <td style="text-align:center;">${l.streaming ? "⇄" : "•"}</td>
+        </tr>`).join("");
+}
+
+async function refreshLogs() {
+    if (logsPaused || currentTab !== "logs") return;
+    if ($("modal-host").classList.contains("active")) return;
+    try {
+        const res = await api("/api/logs?limit=500");
+        uptimeSecs = res.uptime_secs ?? uptimeSecs;
+        $("uptime").textContent = "uptime " + fmtUptime(uptimeSecs);
+        renderLogs(res.logs || []);
+        updateTabCounts();
+    } catch (e) { /* keep last table */ }
+}
+
+/* ═══════════ tabs ═══════════ */
+const TABS = ["providers", "groups", "routed", "fallback", "keys", "logs"];
+let currentTab = "providers";
+
+function selectTab(tab) {
+    currentTab = tab;
+    TABS.forEach(t => {
+        const b = document.querySelector('.tab[data-tab="' + t + '"]');
+        b.setAttribute("aria-selected", String(t === tab));
+        b.tabIndex = t === tab ? 0 : -1;
+        $("panel-" + t).hidden = (t !== tab);
+    });
+    if (tab === "fallback") loadFallbackChain().catch(e => toast(e.message, "err"));
+    if (tab === "logs") refreshLogs();
+}
+$("tablist").addEventListener("click", e => {
+    const b = e.target.closest(".tab"); if (b) selectTab(b.dataset.tab);
+});
+$("tablist").addEventListener("keydown", e => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    const i = TABS.indexOf(currentTab);
+    const next = e.key === "ArrowRight" ? (i + 1) % TABS.length : (i - 1 + TABS.length) % TABS.length;
+    selectTab(TABS[next]);
+    document.querySelector('.tab[data-tab="' + TABS[next] + '"]').focus();
+});
+
+/* ═══════════ global wiring ═══════════ */
+$("btn-refresh").onclick = () => { refreshAll(); refreshLogs(); };
+$("btn-add-provider").onclick = () => openProviderModal(null);
+$("btn-add-group").onclick = () => {
+    if (!Object.keys(providersData).length) { toast("Add at least one provider first", "err"); return; }
+    openGroupModal(null, [], null);
+};
+$("btn-add-routed").onclick = () => {
+    if (!allGroupNames().length) { toast("Create or discover a model group first", "warn"); return; }
+    openRoutedModal(null);
+};
+$("btn-add-key").onclick = () => showCreateApiKeyModal();
+$("btn-refresh-models").onclick = async () => {
+    $("btn-refresh-models").disabled = true;
+    $("btn-refresh-models").innerHTML = '<span class="spinner" style="margin-right:6px;"></span>Refreshing…';
+    try {
+        const res = await api("/api/models/refresh", { method: "POST" });
+        let n = 0;
+        for (const k in res.refreshed) n += (res.refreshed[k].count ?? 0);
+        toast("✓ Refreshed " + Object.keys(res.refreshed).length + " providers · " + n + " models · " + (res.auto_groups_created ?? "?") + " groups", "ok", 5000);
+        await refreshAll();
+    } catch (e) { toast("Refresh failed: " + e.message, "err", 5000); }
+    $("btn-refresh-models").disabled = false;
+    $("btn-refresh-models").textContent = "Refresh All Models";
+};
+
+$("prov-filter").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    currentFilter = b.dataset.f;
+    $("prov-filter").querySelectorAll("button").forEach(x => x.classList.toggle("active", x === b));
+    renderProviders();
+});
+$("group-search").addEventListener("input", e => { groupSearch = e.target.value.trim(); renderGroups(); });
+$("log-model-filter").addEventListener("input", e => { logSearch = e.target.value.trim(); renderLogs(logsData); });
+$("log-result-filter").addEventListener("change", e => { logFilter = e.target.value; renderLogs(logsData); });
+$("log-auto").addEventListener("change", e => { logsPaused = !e.target.checked; if (!logsPaused) refreshLogs(); });
+$("btn-log-clear").onclick = () => {
+    askConfirm("Clear view", "Hide logs older than now? (History kept server-side; new arrivals still stream in.)", "Clear", "danger")
+        .then(ok => { if (ok) { const latest = Math.max(0, ...(logsData.logs || []).map(l => l.ts_ms || 0)); logsClearedUntil = Math.max(Date.now(), latest) + 1; renderLogs(logsData); toast("Log view cleared"); } });
+};
+
+/* container delegation — providers */
+$("providers-container").addEventListener("click", async e => {
+    const card = e.target.closest(".provider-card"); if (!card) return;
+    const name = card.dataset.provider;
+    const btn = e.target.closest("button");
+    if (!btn) return;
+    if (btn.classList.contains("js-edit")) openProviderModal(name);
+    else if (btn.classList.contains("js-test")) testProvider(name);
+    else if (btn.classList.contains("js-models")) refreshProviderModels(name);
+    else if (btn.classList.contains("js-config")) openModelsModal(name);
+    else if (btn.classList.contains("js-del")) {
+        if (await askConfirm("Delete provider", 'Remove "' + name + '" from config? Model groups referencing it will need to be re-saved.', "Delete", "danger")) {
+            try { await api(P(name), { method: "DELETE" }); toast('Provider "' + name + '" deleted', "ok"); refreshAll(); }
+            catch (err) { toast(err.message, "err"); }
+        }
+    }
+});
+$("providers-container").addEventListener("change", e => {
+    const cb = e.target.closest(".js-enable"); if (!cb) return;
+    toggleProvider(cb.closest(".provider-card").dataset.provider, cb.checked);
+});
+
+/* groups */
+$("groups-container").addEventListener("click", async e => {
+    const row = e.target.closest(".row"); if (!row) return;
+    const name = row.dataset.group;
+    const btn = e.target.closest("button"); if (!btn) return;
+    if (btn.classList.contains("js-edit-group")) {
+        openGroupModal(name, groupsData[name].providers || []);
+    } else if (btn.classList.contains("js-del-group")) {
+        if (await askConfirm("Delete model group", 'Delete group "' + name + '"? Routed models referencing it will fail validation on next save.', "Delete", "danger")) {
+            try { await api(G(name), { method: "DELETE" }); toast('Group "' + name + '" deleted', "ok"); refreshAll(); }
+            catch (err) { toast(err.message, "err"); }
+        }
+    } else if (btn.classList.contains("js-promote")) {
+        openGroupModal(null, groupsData[name].providers || [], name);
+    }
+});
+
+/* routed */
+$("routed-container").addEventListener("click", async e => {
+    const row = e.target.closest(".row"); if (!row) return;
+    const name = row.dataset.routed;
+    const btn = e.target.closest("button"); if (!btn) return;
+    if (btn.classList.contains("js-edit-routed")) openRoutedModal(name);
+    else if (btn.classList.contains("js-del-routed")) {
+        if (await askConfirm("Delete routed model", 'Delete routed model "' + name + '"? Clients calling it will fall through to the fallback chain.', "Delete", "danger")) {
+            try { await api(R(name), { method: "DELETE" }); toast('Routed model "' + name + '" deleted', "ok"); refreshAll(); }
+            catch (err) { toast(err.message, "err"); }
+        }
+    }
+});
+
+/* modal chrome: Esc + backdrop close, Tab focus trap */
+$("modal-x").onclick = closeModal;
+$("modal-host").addEventListener("mousedown", (e) => { if (e.target.id === "modal-host") closeModal(); });
+document.addEventListener("keydown", (e) => {
+    if (!$("modal-host").classList.contains("active")) return;
+    if (e.key === "Escape") { closeModal(); return; }
+    if (e.key !== "Tab") return;
+    const f = [...$("modal-body").querySelectorAll('button,input,select,textarea,[tabindex]:not([tabindex="-1"])')]
+        .filter(el => !el.disabled && el.offsetParent !== null);
+    if (!f.length) return;
+    const first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
+
+/* ═══════════ boot ═══════════ */
+refreshAll();
+setInterval(refreshAll, 5000);
+setInterval(refreshLogs, 4000);
+if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+</script>
+</body>
+</html>
