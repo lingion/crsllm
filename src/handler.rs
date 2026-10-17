@@ -359,6 +359,8 @@ pub fn auto_generate_model_groups(discovered: &std::collections::HashMap<String,
 
 #[derive(serde::Deserialize)]
 pub struct CreateApiKeyRequest {
+    /// Optional custom key. Empty/absent ⇒ server generates `crsllm-<uuid>`.
+    #[serde(default)]
     pub key: String,
 }
 

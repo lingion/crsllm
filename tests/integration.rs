@@ -100,3 +100,15 @@ fn test_gateway_config_default_has_no_keys() {
     let g = crsllm::config::GatewayConfig::default();
     assert!(g.api_keys.is_empty());
 }
+
+#[test]
+fn test_create_api_key_request_absent_key_default() {
+    // Third-party callers POST `{}` or omit `key` entirely; that used to be a
+    // 422. serde(default) must accept it and let the server generate a UUID.
+    let req: crsllm::handler::CreateApiKeyRequest =
+        serde_json::from_str("{}").expect("empty body should deserialize");
+    assert_eq!(req.key, "");
+    let req2: crsllm::handler::CreateApiKeyRequest =
+        serde_json::from_str(r#"{"key":"custom"}"#).unwrap();
+    assert_eq!(req2.key, "custom");
+}
