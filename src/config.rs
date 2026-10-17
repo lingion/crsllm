@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 /// Provider configuration for a specific key/endpoint.
@@ -312,10 +312,109 @@ pub fn load_registry(path: &str) -> Result<ProviderRegistry, ConfigError> {
 
 pub fn load_config(path: &str) -> Result<Config, ConfigError> {
     let contents = std::fs::read_to_string(path).map_err(ConfigError::Io)?;
+    let contents = dedup_toml_tables(&contents);
     let config: Config = toml::from_str(&contents).map_err(ConfigError::Parse)?;
     Ok(config)
 }
 
+/// Drop duplicate key assignments across repeated `[table]` blocks.
+///
+/// Hand-edited configs can end up with the same simple table declared twice
+/// (e.g. a legacy `[timeouts]` block plus a console-written one), which is
+/// invalid TOML and made every fresh boot panic. Duplicate top-level table
+/// blocks are merged into their first occurrence (first assignment of each
+/// key wins); anything else is returned untouched so the parser still
+/// reports real errors honestly.
+pub fn dedup_toml_tables(contents: &str) -> String {
+    if toml::from_str::<toml::Value>(contents).is_ok() {
+        return contents.to_string();
+    }
+
+    struct Block {
+        header: Option<String>,
+        lines: Vec<String>,
+    }
+    let mut blocks: Vec<Block> = Vec::new();
+    for line in contents.lines() {
+        let t = line.trim();
+        let is_header = (t.starts_with("[[") && t.ends_with("]]"))
+            || (t.starts_with('[') && t.ends_with(']') && !t.contains('='));
+        if is_header {
+            blocks.push(Block { header: Some(t.to_string()), lines: vec![line.to_string()] });
+        } else if let Some(last) = blocks.last_mut() {
+            last.lines.push(line.to_string());
+        } else {
+            blocks.push(Block { header: None, lines: vec![line.to_string()] });
+        }
+    }
+
+    // Count simple (single-segment, non-array) table headers.
+    let mut counts: HashMap<String, usize> = HashMap::new();
+    for b in &blocks {
+        if let Some(h) = &b.header {
+            if !h.starts_with("[[") && !h.contains(" \"") {
+                *counts.entry(h.clone()).or_default() += 1;
+            }
+        }
+    }
+
+    fn key_of(line: &str) -> Option<String> {
+        let t = line.trim();
+        if t.is_empty() || t.starts_with('#') {
+            return None;
+        }
+        let eq = t.find('=')?;
+        let k = t[..eq].trim().to_string();
+        if k.is_empty() || k.contains(char::is_whitespace) {
+            None
+        } else {
+            Some(k)
+        }
+    }
+
+    let mut seen_headers: HashMap<String, usize> = HashMap::new();
+    let mut out: Vec<String> = Vec::new();
+    for b in &blocks {
+        let dup = b
+            .header
+            .as_ref()
+            .map(|h| counts.get(h).copied().unwrap_or(0) > 1)
+            .unwrap_or(false);
+        if !dup {
+            out.extend(b.lines.iter().cloned());
+            continue;
+        }
+        let h = b.header.clone().unwrap();
+        if seen_headers.contains_key(&h) {
+            continue; // duplicate block: folded into the first occurrence
+        }
+        seen_headers.insert(h.clone(), 1);
+        out.push(b.lines[0].clone());
+        // Merge bodies of ALL occurrences in file order, first key wins.
+        let mut keys: HashSet<String> = HashSet::new();
+        let mut body: Vec<String> = Vec::new();
+        let mut comment_lines: Vec<String> = Vec::new();
+        for b2 in blocks.iter().filter(|x| x.header.as_ref() == Some(&h)) {
+            for line in b2.lines.iter().skip(1) {
+                match key_of(line) {
+                    Some(k) => {
+                        if keys.insert(k) {
+                            body.push(line.clone());
+                        }
+                    }
+                    None => {
+                        if !line.trim().is_empty() {
+                            comment_lines.push(line.clone());
+                        }
+                    }
+                }
+            }
+        }
+        out.extend(body);
+        out.extend(comment_lines);
+    }
+    out.join("\n")
+}
 pub fn save_config(config: &Config, path: &str) -> Result<(), ConfigError> {
     let contents = toml::to_string_pretty(config).map_err(|e| {
         ConfigError::Io(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
@@ -436,6 +535,56 @@ base_url = "https://x"
 "#;
         let config: Config = toml::from_str(toml_src).unwrap();
         assert!(config.providers["demo"].enabled);
+    }
+
+    #[test]
+    fn test_dedup_merges_duplicate_timeouts() {
+        // A legacy hand-written [timeouts] plus a console-written one used to
+        // panic every fresh boot ("invalid TOML"). Merge must keep the FIRST
+        // assignment of each key and drop the rest.
+        let raw = r#"
+[timeouts]
+sse_inactivity_secs = 1
+deadline_secs = 2
+
+[timeouts]
+sse_inactivity_secs = 120
+deadline_secs = 300
+model_header_timeout_secs = 15
+
+[providers.demo]
+api_key = "k"
+base_url = "https://x"
+"#;
+        let fixed = dedup_toml_tables(raw);
+        let config: Config = toml::from_str(&fixed).expect("merged config should parse");
+        assert_eq!(config.timeouts.sse_inactivity_secs, 1);
+        assert_eq!(config.timeouts.deadline_secs, 2);
+        assert!(config.providers.contains_key("demo"));
+    }
+
+    #[test]
+    fn test_dedup_passes_healthy_config_through() {
+        let raw = r#"
+[timeouts]
+sse_inactivity_secs = 120
+
+[providers.demo]
+api_key = "k"
+base_url = "https://x"
+
+[[aot]]
+name = "x"
+"#;
+        assert_eq!(dedup_toml_tables(raw), raw.to_string());
+    }
+
+    #[test]
+    fn test_dedup_still_rejects_genuinely_broken_toml() {
+        // Missing bracket must NOT be silently "repaired" — parse must fail.
+        let raw = "[providers\napi_key = \"k\"\n";
+        let fixed = dedup_toml_tables(raw);
+        assert!(toml::from_str::<Config>(&fixed).is_err());
     }
 
     // Standalone helper for tests (no Config needed).

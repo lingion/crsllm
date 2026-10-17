@@ -112,3 +112,42 @@ fn test_create_api_key_request_absent_key_default() {
         serde_json::from_str(r#"{"key":"custom"}"#).unwrap();
     assert_eq!(req2.key, "custom");
 }
+
+#[test]
+fn test_load_config_heals_duplicate_timeouts() {
+    // A prior save_config() wrote [timeouts] twice (once per retry+timeouts
+    // split); load_config must heal it, not error out. This is the exact
+    // shape that poisoned the live config: bare [timeouts] + [providers.*]
+    // + a second trailing [timeouts].
+    let dir = std::env::temp_dir().join(format!("crsllm-dedup-it-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("dup.toml");
+    std::fs::write(
+        &path,
+        r#"
+[timeouts]
+sse_inactivity_secs = 90
+deadline_secs = 600
+
+[providers.p]
+api_key = "k"
+base_url = "http://127.0.0.1:1/v1"
+
+[timeouts]
+sse_inactivity_secs = 91
+deadline_secs = 601
+"#,
+    )
+    .unwrap();
+    let cfg = crsllm::config::load_config(path.to_str().unwrap())
+        .expect("duplicate [timeouts] must heal, not error");
+    assert_eq!(cfg.providers.len(), 1);
+    assert_eq!(cfg.timeouts.sse_inactivity_secs, 90); // dedup merges blocks, first key wins
+    // save_config (called on any console change) rewrites the file without the
+    // duplicate, closing the loop: boot heals, save persists the healed form.
+    crsllm::config::save_config(&cfg, path.to_str().unwrap()).unwrap();
+    let healed = std::fs::read_to_string(&path).unwrap();
+    assert_eq!(healed.matches("[timeouts]").count(), 1);
+    std::fs::remove_dir_all(&dir).ok();
+}
