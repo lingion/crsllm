@@ -1,0 +1,21 @@
+/target
+
+# Real configs carry live provider keys — never commit them
+config/crsllm.toml
+config/crsllm.toml.bak
+config/*.discovered.toml
+*.bak
+*.local.toml
+
+.env
+.DS_Store
+.impeccable/
+.playwright-mcp/
+
+# dev leftovers, not part of the shipped repo
+/CONFIG_COMPLETE.md
+/DASHBOARD_STATUS.md
+/IMPLEMENTATION_REPORT.md
+/test_discover.rs
+/fix_auth.py
+web/dashboard-old.html
