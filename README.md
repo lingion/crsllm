@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/lingion/crsllm/releases"><img src="https://img.shields.io/badge/crsllm-0.1.0-4facfe?style=flat-square" alt="crsllm version 0.1.0"></a>
+  <a href="https://github.com/lingion/crsllm/releases"><img src="https://img.shields.io/badge/crsllm-0.1.1-4facfe?style=flat-square" alt="crsllm version 0.1.1"></a>
   <img src="https://img.shields.io/github/stars/lingion/crsllm?style=flat-square&logo=github" alt="Stars">
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-4c9aff?style=flat-square" alt="Platforms">
   <img src="https://img.shields.io/badge/lang-Rust-dea584?style=flat-square&logo=rust&logoColor=white" alt="Rust">
@@ -38,10 +38,11 @@
 
 ## What is CRSLLM?
 
-CRSLLM is a **single-binary, self-hosted gateway** in front of all your LLM providers. Clients speak one of two dialects; the gateway translates, routes, and fails over:
+CRSLLM is a **single-binary, self-hosted gateway** in front of all your LLM providers. Clients speak one of three dialects; the gateway translates, routes, and fails over:
 
 - **`POST /v1/messages`** — Anthropic Messages API (Claude Code, Anthropic SDKs)
 - **`POST /v1/chat/completions`** — OpenAI Chat Completions API (Codex, most SDKs/tools)
+- **`POST /v1/responses`** — OpenAI Responses API (latest OpenAI SDK, agents, tool use)
 
 Requests are resolved through **model groups** (an ordered provider list per logical model) and a **fallback chain** (cross-group failover order). Every upstream error is classified (`429` rate limit, `402` quota, `403` forbidden, `404` model not found, timeout, …) and triggers an **immediate retry on the next provider** — including mid-stream SSE failures (inactivity timeout + abrupt-EOF detection). An 81-provider registry ships in `config/providers.toml` (base URL, auth style, model-discovery path).
 
@@ -49,13 +50,14 @@ Requests are resolved through **model groups** (an ordered provider list per log
 
 | Area | What you get |
 |---|---|
-| Interfaces | Anthropic `/v1/messages` + OpenAI `/v1/chat/completions`, transparent cross-translation |
+| Interfaces | Anthropic `/v1/messages` + OpenAI `/v1/chat/completions` + OpenAI `/v1/responses`, transparent cross-translation |
 | Routing | Model groups · routed models · global fallback chain · per-provider priority & enable/disable |
 | Resilience | Error classification with instant failover, SSE streaming with inactivity + EOF guarding, per-stage timeouts (connect/TTFT/generation/total) |
 | Discovery | `POST /api/refresh-models` probes every provider concurrently and caches results; `GET /v1/models` then serves OpenAI-shaped `data[]` instantly |
 | Access control | Client API keys (via `x-api-key` header or `Authorization: Bearer`), create/rotate/revoke from the console |
 | Console | Live web dashboard: providers, groups, routes, fallback, API keys, request logs, metrics sparklines |
 | Observability | `/metrics`, request history, per-provider success/TTFT stats persisted in config |
+| CLI | `--help`, `--init`, `--version`, `--port`, `--config`, `--discover-models`; auto-config on first run |
 
 ## Why "CRSLLM"?
 
@@ -71,6 +73,7 @@ crsllm/
 │   ├── router.rs          # model-group resolution, fallback chain, failover loop
 │   ├── config.rs          # TOML config, provider registry, key masking, save/reload
 │   ├── translator.rs      # Anthropic ⇄ OpenAI request/response translation
+│   ├── responses.rs       # OpenAI Responses API types, translation, streaming events
 │   ├── error.rs           # error classification (ported failover semantics)
 │   ├── metrics.rs         # per-provider stats, success rate, TTFT percentiles
 │   ├── model_resolver.rs  # logical name → provider-native model id mapping
@@ -80,7 +83,10 @@ crsllm/
 ├── config/
 │   ├── crsllm.toml.example  # annotated reference config — copy to crsllm.toml
 │   └── providers.toml       # 81-provider registry (base_url / auth_type / models_path)
+├── scripts/
+│   └── install.sh           # one-command install to ~/.cargo/bin
 ├── tests/integration.rs     # end-to-end HTTP tests incl. auth enforcement
+├── Makefile                 # build, run, install, test, discover targets
 └── docs/                    # mark, screenshots, provider catalog
 ```
 
@@ -208,6 +214,7 @@ Changes made in the console are written back to `config/crsllm.toml` and hot-rel
 |---|---|---|
 | `POST /v1/messages` | client key* | Anthropic Messages (Claude dialect) |
 | `POST /v1/chat/completions` | client key* | OpenAI Chat Completions (translated internally) |
+| `POST /v1/responses` | client key* | OpenAI Responses API (agents, tool use, latest SDK) |
 | `GET /v1/models` | client key* | List cached models (OpenAI shape, no live probing) |
 | `POST /api/refresh-models` | loopback | Re-probe all providers concurrently, update cache & auto-groups |
 | `GET /health` | open | Liveness probe |
@@ -225,8 +232,9 @@ Changes made in the console are written back to `config/crsllm.toml` and hot-rel
 ## Development
 
 ```bash
-cargo test            # unit + integration (49 tests): routing, failover, auth, translation
+cargo test            # unit + integration (95 tests): routing, failover, auth, translation, responses API
 cargo run             # dev server on :3002 with env-filter tracing
+make help             # show all build/run/install targets
 ```
 
 ## License

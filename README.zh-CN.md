@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/lingion/crsllm/releases"><img src="https://img.shields.io/badge/crsllm-0.1.0-4facfe?style=flat-square" alt="crsllm 版本 0.1.0"></a>
+  <a href="https://github.com/lingion/crsllm/releases"><img src="https://img.shields.io/badge/crsllm-0.1.1-4facfe?style=flat-square" alt="crsllm 版本 0.1.1"></a>
   <img src="https://img.shields.io/github/stars/lingion/crsllm?style=flat-square&logo=github" alt="Stars">
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-4c9aff?style=flat-square" alt="支持平台">
   <img src="https://img.shields.io/badge/lang-Rust-dea584?style=flat-square&logo=rust&logoColor=white" alt="Rust">
@@ -37,10 +37,11 @@
 
 ## CRSLLM 是什么？
 
-CRSLLM 是一个**单二进制、可自托管**的 LLM 前置网关。客户端只用两种协议之一接入，网关负责翻译、路由与故障转移：
+CRSLLM 是一个**单二进制、可自托管**的 LLM 前置网关。客户端只用三种协议之一接入，网关负责翻译、路由与故障转移：
 
 - **`POST /v1/messages`** —— Anthropic Messages API（Claude Code、Anthropic SDK）
 - **`POST /v1/chat/completions`** —— OpenAI Chat Completions API（Codex、绝大多数 SDK/工具）
+- **`POST /v1/responses`** —— OpenAI Responses API（最新 OpenAI SDK、Agent、工具调用）
 
 请求经过**模型组**（每个逻辑模型对应一个有序供应商列表）与**回退链**（跨组故障转移顺序）解析。所有上游错误都会被分类（`429` 限流、`402` 配额耗尽、`403` 无权限、`404` 模型不存在、超时……）并**立刻在下一个供应商重试**——包括流式 SSE 中途失败（空闲超时 + 突然断流检测）。`config/providers.toml` 内置 81 个供应商注册表（base URL、鉴权方式、模型发现路径）。
 
@@ -48,13 +49,14 @@ CRSLLM 是一个**单二进制、可自托管**的 LLM 前置网关。客户端�
 
 | 领域 | 能力 |
 |---|---|
-| 接口 | Anthropic `/v1/messages` + OpenAI `/v1/chat/completions`，协议透明互转 |
+| 接口 | Anthropic `/v1/messages` + OpenAI `/v1/chat/completions` + OpenAI `/v1/responses`，协议透明互转 |
 | 路由 | 模型组 · 路由模型 · 全局回退链 · 供应商优先级与启停 |
 | 容错 | 错误分类即时故障转移、SSE 空闲/断流守护、分阶段超时（连接/首字/生成/总时限） |
 | 模型发现 | `POST /api/refresh-models` 并发探测所有供应商并缓存结果；`GET /v1/models` 即时返回 OpenAI 格式 `data[]` |
 | 访问控制 | 客户端 API Key（`x-api-key` 或 `Authorization: Bearer`），控制台创建/轮换/吊销 |
 | 控制台 | 实时 Web 面板：供应商、模型组、路由、回退、API 密钥、请求日志、指标曲线 |
 | 可观测 | `/metrics`、请求历史、每供应商成功率/TTFT 统计并持久化到配置 |
+| CLI | `--help`、`--init`、`--version`、`--port`、`--config`、`--discover-models`；首次运行自动创建配置 |
 
 ## 为什么叫 "CRSLLM"？
 
@@ -70,6 +72,7 @@ crsllm/
 │   ├── router.rs          # 模型组解析、回退链、故障转移循环
 │   ├── config.rs          # TOML 配置、供应商注册表、密钥掩码、保存/热重载
 │   ├── translator.rs      # Anthropic ⇄ OpenAI 请求/响应翻译
+│   ├── responses.rs       # OpenAI Responses API 类型、翻译、流式事件
 │   ├── error.rs           # 错误分类（移植的故障转移语义）
 │   ├── metrics.rs         # 每供应商统计、成功率、TTFT 分位数
 │   ├── model_resolver.rs  # 逻辑名 → 供应商原生模型 ID 映射
@@ -79,7 +82,10 @@ crsllm/
 ├── config/
 │   ├── crsllm.toml.example  # 带注释的参考配置 —— 复制为 crsllm.toml 使用
 │   └── providers.toml       # 81 供应商注册表（base_url / auth_type / models_path）
+├── scripts/
+│   └── install.sh           # 一键安装到 ~/.cargo/bin
 ├── tests/integration.rs     # 端到端 HTTP 测试（含鉴权）
+├── Makefile                 # build、run、install、test、discover 等目标
 └── docs/                    # 项目标记、截图、供应商清单
 ```
 
@@ -207,6 +213,7 @@ deadline_secs       = 120
 |---|---|---|
 | `POST /v1/messages` | 客户端 Key* | Anthropic Messages（Claude 协议） |
 | `POST /v1/chat/completions` | 客户端 Key* | OpenAI Chat Completions（内部翻译） |
+| `POST /v1/responses` | 客户端 Key* | OpenAI Responses API（Agent、工具调用、最新 SDK） |
 | `GET /v1/models` | 客户端 Key* | 列出缓存模型（OpenAI 格式，不做实时探测） |
 | `POST /api/refresh-models` | 仅本机 | 并发重探所有供应商，更新缓存与自动模型组 |
 | `GET /health` | 开放 | 存活探测 |
@@ -224,8 +231,9 @@ deadline_secs       = 120
 ## 开发
 
 ```bash
-cargo test            # 单元 + 集成（49 项）：路由、故障转移、鉴权、翻译
+cargo test            # 单元 + 集成（95 项）：路由、故障转移、鉴权、翻译、Responses API
 cargo run             # :3002 开发实例，env-filter 日志
+make help             # 显示所有构建/运行/安装目标
 ```
 
 ## 许可证
