@@ -92,10 +92,22 @@ crsllm/
 
 ```bash
 git clone https://github.com/lingion/crsllm && cd crsllm
-cargo build --release
 
-cp config/crsllm.toml.example config/crsllm.toml   # 填入你的供应商 Key
-./target/release/crsllm                            # 监听 0.0.0.0:3002
+# 方式 A：一键安装
+make install          # 编译 release → ~/.cargo/bin/crsllm
+crsllm --init         # 从模板创建配置，然后填入你的 Key
+crsllm                # 启动网关，监听 :3002
+
+# 方式 B：从源码运行
+make run              # 自动创建配置，编译并运行
+```
+
+或手动操作：
+
+```bash
+cargo build --release
+./target/release/crsllm --init    # 从模板创建配置
+./target/release/crsllm           # 监听 0.0.0.0:3002
 ```
 
 打开 **http://127.0.0.1:3002/dashboard** 即可开始运维：
@@ -112,8 +124,12 @@ cp config/crsllm.toml.example config/crsllm.toml   # 填入你的供应商 Key
 CLI 参数：
 
 ```bash
-crsllm --port 8080                                   # 自定义端口（默认 3002）
-crsllm --discover-models [--config path/to/crsllm.toml]   # 探测所有供应商并保存结果
+crsllm --help                          # 显示所有选项
+crsllm --version                       # 显示版本
+crsllm --init                          # 从模板创建 config/crsllm.toml
+crsllm --port 8080                     # 自定义端口（默认 3002）
+crsllm --config path/to/crsllm.toml    # 自定义配置路径
+crsllm --discover-models               # 探测所有供应商并保存结果
 ```
 
 ## 接入 Codex & Claude Code
