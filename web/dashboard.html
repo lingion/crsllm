@@ -255,7 +255,7 @@ header {
 #toast-zone { position: fixed; bottom: 20px; right: 20px; z-index: 1100; display: flex; flex-direction: column; gap: 8px; max-width: 420px; }
 .toast {
     background: var(--bg-raised); border: 1px solid var(--line-strong);
-    border-left: 3px solid var(--accent);
+    border-left: 2px solid var(--accent);
     padding: 10px 14px; font-size: 12px; box-shadow: 0 4px 18px rgba(0,0,0,.5);
 }
 .toast.err { border-left-color: var(--err); }
@@ -287,66 +287,67 @@ header {
 
     <header>
         <div class="brand">
-            <h1><span class="glyph">&gt;_</span> CRSLLM Gateway</h1>
-            <div class="tagline">multi-provider routing · no-cooldown failover</div>
+            <h1><span class="glyph">&gt;_</span> <span data-i18n="gateway.title">CRSLLM Gateway</span></h1>
+            <div class="tagline" data-i18n="gateway.tagline">multi-provider routing · no-cooldown failover</div>
         </div>
         <div class="status-line">
-            <span><span class="live-dot" id="live-dot"></span><span id="gateway-status">connecting…</span></span>
-            <span id="uptime">uptime —</span>
+            <span><span class="live-dot" id="live-dot"></span><span id="gateway-status" data-i18n="gateway.status.connecting">connecting…</span></span>
+            <span id="uptime" data-i18n="misc.uptime">uptime —</span>
             <span id="refresh-ts">—</span>
         </div>
         <div class="hdr-actions">
-            <button class="btn" id="btn-refresh" aria-label="Refresh all data">Refresh</button>
-            <button class="btn btn-primary" id="btn-add-provider">+ Provider</button>
+            <button class="btn" id="btn-lang" onclick="toggleLang()" aria-label="Toggle language">中/EN</button>
+            <button class="btn" id="btn-refresh" aria-label="Refresh all data" data-i18n="btn.refresh">Refresh</button>
+            <button class="btn btn-primary" id="btn-add-provider" data-i18n="btn.addProvider">+ Provider</button>
         </div>
     </header>
 
     <div class="stats-grid" role="region" aria-label="Gateway statistics">
-        <div class="stat-cell"><div class="label">PROVIDERS</div><div class="value" id="st-providers">—</div></div>
-        <div class="stat-cell"><div class="label">ENABLED</div><div class="value" id="st-enabled">—</div></div>
-        <div class="stat-cell"><div class="label">REQUESTS</div><div class="value" id="st-requests">—</div></div>
-        <div class="stat-cell"><div class="label">SUCCESS RATE</div><div class="value" id="st-success">—</div></div>
-        <div class="stat-cell"><div class="label">MEDIAN TTFT</div><div class="value" id="st-ttft">— <small>ms</small></div></div>
-        <div class="stat-cell"><div class="label">GROUPS</div><div class="value" id="st-groups">—</div></div>
+        <div class="stat-cell"><div class="label" data-i18n="stat.providers">PROVIDERS</div><div class="value" id="st-providers">—</div></div>
+        <div class="stat-cell"><div class="label" data-i18n="stat.enabled">ENABLED</div><div class="value" id="st-enabled">—</div></div>
+        <div class="stat-cell"><div class="label" data-i18n="stat.requests">REQUESTS</div><div class="value" id="st-requests">—</div></div>
+        <div class="stat-cell"><div class="label" data-i18n="stat.successRate">SUCCESS RATE</div><div class="value" id="st-success">—</div></div>
+        <div class="stat-cell"><div class="label" data-i18n="stat.ttft">MEDIAN TTFT</div><div class="value" id="st-ttft">— <small data-i18n="misc.ms">ms</small></div></div>
+        <div class="stat-cell"><div class="label" data-i18n="stat.groups">GROUPS</div><div class="value" id="st-groups">—</div></div>
     </div>
 
     <nav aria-label="Console sections">
         <div class="tablist" role="tablist" id="tablist">
-            <button class="tab" role="tab" id="tab-providers" aria-controls="panel-providers" aria-selected="true" data-tab="providers">Providers<span class="count" id="tc-providers"></span></button>
-            <button class="tab" role="tab" id="tab-groups" aria-controls="panel-groups" aria-selected="false" data-tab="groups" tabindex="-1">Model Groups<span class="count" id="tc-groups"></span></button>
-            <button class="tab" role="tab" id="tab-routed" aria-controls="panel-routed" aria-selected="false" data-tab="routed" tabindex="-1">Routed Models<span class="count" id="tc-routed"></span></button>
-            <button class="tab" role="tab" id="tab-fallback" aria-controls="panel-fallback" aria-selected="false" data-tab="fallback" tabindex="-1">Fallback Chain</button>
-            <button class="tab" role="tab" id="tab-keys" aria-controls="panel-keys" aria-selected="false" data-tab="keys" tabindex="-1">API Keys<span class="count" id="tc-keys"></span></button>
-            <button class="tab" role="tab" id="tab-logs" aria-controls="panel-logs" aria-selected="false" data-tab="logs" tabindex="-1">Logs<span class="count" id="tc-logs"></span></button>
+            <button class="tab" role="tab" id="tab-providers" aria-controls="panel-providers" aria-selected="true" data-tab="providers"><span data-i18n="tab.providers">Providers</span><span class="count" id="tc-providers"></span></button>
+            <button class="tab" role="tab" id="tab-groups" aria-controls="panel-groups" aria-selected="false" data-tab="groups" tabindex="-1"><span data-i18n="tab.groups">Model Groups</span><span class="count" id="tc-groups"></span></button>
+            <button class="tab" role="tab" id="tab-routed" aria-controls="panel-routed" aria-selected="false" data-tab="routed" tabindex="-1"><span data-i18n="tab.routed">Routed Models</span><span class="count" id="tc-routed"></span></button>
+            <button class="tab" role="tab" id="tab-fallback" aria-controls="panel-fallback" aria-selected="false" data-tab="fallback" tabindex="-1"><span data-i18n="tab.fallback">Fallback Chain</span></button>
+            <button class="tab" role="tab" id="tab-keys" aria-controls="panel-keys" aria-selected="false" data-tab="keys" tabindex="-1"><span data-i18n="tab.keys">API Keys</span><span class="count" id="tc-keys"></span></button>
+            <button class="tab" role="tab" id="tab-logs" aria-controls="panel-logs" aria-selected="false" data-tab="logs" tabindex="-1"><span data-i18n="tab.logs">Logs</span><span class="count" id="tc-logs"></span></button>
         </div>
     </nav>
 
     <section class="panel" role="tabpanel" id="panel-providers" aria-labelledby="tab-providers">
         <div class="panel-toolbar">
             <div class="tablist" role="group" aria-label="Provider health filter" id="prov-filter" style="border:none;background:transparent;margin:0;">
-                <button class="tab active" data-filter="all">All</button>
-                <button class="tab" data-filter="healthy">Healthy</button>
-                <button class="tab" data-filter="warning">Warning</button>
-                <button class="tab" data-filter="error">Error</button>
-                <button class="tab" data-filter="no-data">No Data</button>
-                <button class="tab" data-filter="disabled">Disabled</button>
+                <button class="tab active" data-filter="all" data-i18n="filter.all">All</button>
+                <button class="tab" data-filter="healthy" data-i18n="filter.healthy">Healthy</button>
+                <button class="tab" data-filter="warning" data-i18n="filter.warning">Warning</button>
+                <button class="tab" data-filter="error" data-i18n="filter.error">Error</button>
+                <button class="tab" data-filter="no-data" data-i18n="filter.noData">No Data</button>
+                <button class="tab" data-filter="disabled" data-i18n="filter.disabled">Disabled</button>
             </div>
             <div style="display:flex;gap:8px;">
-                <button class="btn" id="btn-refresh-models">Refresh All Models</button>
+                <button class="btn" id="btn-refresh-models" data-i18n="btn.refreshModels">Refresh All Models</button>
             </div>
         </div>
-        <div id="providers-container"><div class="loading"><div class="spinner"></div>Loading providers…</div></div>
+        <div id="providers-container"><div class="loading"><div class="spinner"></div><span data-i18n="label.loadingProviders">Loading providers…</span></div></div>
     </section>
 
     <section class="panel" role="tabpanel" id="panel-groups" aria-labelledby="tab-groups" hidden>
         <div class="panel-toolbar">
-            <input type="text" class="picker-search" id="group-search" placeholder="Search groups…" aria-label="Search model groups" style="max-width:260px;margin:0;">
-            <button class="btn btn-primary" id="btn-add-group">+ Model Group</button>
+            <input type="text" class="picker-search" id="group-search" data-i18n-placeholder="label.searchGroups" placeholder="Search groups…" aria-label="Search model groups" style="max-width:260px;margin:0;">
+            <button class="btn btn-primary" id="btn-add-group" data-i18n="btn.addGroup">+ Model Group</button>
         </div>
-        <p style="color:var(--text-mute);font-size:11px;margin-bottom:10px;">
+        <p style="color:var(--text-mute);font-size:11px;margin-bottom:10px;" data-i18n="label.groupDescription">
             Model group = the set of providers that serve one logical model; the provider order is the intra-group failover order.
         </p>
-        <div id="groups-container"><div class="loading"><div class="spinner"></div>Loading groups…</div></div>
+        <div id="groups-container"><div class="loading"><div class="spinner"></div><span data-i18n="label.loadingGroups">Loading groups…</span></div></div>
     </section>
 
     <section class="panel" role="tabpanel" id="panel-routed" aria-labelledby="tab-routed" hidden>
@@ -439,6 +440,233 @@ header {
 
 <script>
 "use strict";
+
+/* ═══════════ i18n ═══════════ */
+const I18N = {
+    en: {
+        // Header
+        "gateway.title": "CRSLLM Gateway",
+        "gateway.tagline": "multi-provider routing · no-cooldown failover",
+        "gateway.status.connecting": "connecting…",
+        "gateway.status.connected": "connected",
+        "gateway.status.disconnected": "disconnected",
+        "btn.refresh": "Refresh",
+        "btn.addProvider": "+ Provider",
+        
+        // Stats
+        "stat.providers": "PROVIDERS",
+        "stat.enabled": "ENABLED",
+        "stat.requests": "REQUESTS",
+        "stat.successRate": "SUCCESS RATE",
+        "stat.ttft": "MEDIAN TTFT",
+        "stat.groups": "GROUPS",
+        
+        // Tabs
+        "tab.providers": "Providers",
+        "tab.groups": "Model Groups",
+        "tab.routed": "Routed Models",
+        "tab.fallback": "Fallback Chain",
+        "tab.keys": "API Keys",
+        "tab.logs": "Logs",
+        
+        // Provider filters
+        "filter.all": "All",
+        "filter.healthy": "Healthy",
+        "filter.warning": "Warning",
+        "filter.error": "Error",
+        "filter.noData": "No Data",
+        "filter.disabled": "Disabled",
+        
+        // Buttons
+        "btn.refreshModels": "Refresh All Models",
+        "btn.addGroup": "+ Model Group",
+        "btn.saveChain": "Save Chain",
+        "btn.addKey": "+ New Key",
+        "btn.save": "Save",
+        "btn.cancel": "Cancel",
+        "btn.delete": "Delete",
+        "btn.edit": "Edit",
+        "btn.create": "Create",
+        
+        // Labels
+        "label.search": "Search",
+        "label.searchGroups": "Search groups…",
+        "label.loading": "Loading",
+        "label.loadingProviders": "Loading providers…",
+        "label.loadingGroups": "Loading groups…",
+        "label.noGroups": "No model groups yet.",
+        "label.useRefresh": "Use Refresh All Models in the Providers tab to auto-discover them, or create one with + Model Group.",
+        "label.groupDescription": "Model group = the set of providers that serve one logical model; the provider order is the intra-group failover order.",
+        
+        // Provider card
+        "provider.enabled": "Enabled",
+        "provider.disabled": "Disabled",
+        "provider.models": "models",
+        "provider.latency": "latency",
+        "provider.success": "success",
+        "provider.requests": "requests",
+        
+        // Modals
+        "modal.addProvider": "Add Provider",
+        "modal.editProvider": "Edit Provider",
+        "modal.addGroup": "Add Model Group",
+        "modal.editGroup": "Edit Model Group",
+        "modal.addKey": "Create API Key",
+        "modal.confirmDelete": "Confirm Delete",
+        "modal.confirmDeleteMsg": "Are you sure you want to delete",
+        
+        // Form labels
+        "form.name": "Name",
+        "form.apiKey": "API Key",
+        "form.baseUrl": "Base URL",
+        "form.priority": "Priority",
+        "form.enabled": "Enabled",
+        "form.models": "Models",
+        "form.providers": "Providers",
+        "form.selectProviders": "Select providers to include (order = failover priority)",
+        
+        // Toast messages
+        "toast.saved": "Saved",
+        "toast.deleted": "Deleted",
+        "toast.created": "Created",
+        "toast.error": "Error",
+        "toast.saveFailed": "Save failed",
+        
+        // Misc
+        "misc.ms": "ms",
+        "misc.uptime": "uptime",
+        "misc.refreshTs": "Refreshed",
+    },
+    zh: {
+        // Header
+        "gateway.title": "CRSLLM 网关",
+        "gateway.tagline": "多供应商路由 · 零冷却故障转移",
+        "gateway.status.connecting": "连接中…",
+        "gateway.status.connected": "已连接",
+        "gateway.status.disconnected": "已断开",
+        "btn.refresh": "刷新",
+        "btn.addProvider": "+ 供应商",
+        
+        // Stats
+        "stat.providers": "供应商",
+        "stat.enabled": "已启用",
+        "stat.requests": "请求数",
+        "stat.successRate": "成功率",
+        "stat.ttft": "中位首字",
+        "stat.groups": "模型组",
+        
+        // Tabs
+        "tab.providers": "供应商",
+        "tab.groups": "模型组",
+        "tab.routed": "路由模型",
+        "tab.fallback": "回退链",
+        "tab.keys": "API 密钥",
+        "tab.logs": "日志",
+        
+        // Provider filters
+        "filter.all": "全部",
+        "filter.healthy": "健康",
+        "filter.warning": "警告",
+        "filter.error": "错误",
+        "filter.noData": "无数据",
+        "filter.disabled": "已禁用",
+        
+        // Buttons
+        "btn.refreshModels": "刷新所有模型",
+        "btn.addGroup": "+ 模型组",
+        "btn.saveChain": "保存回退链",
+        "btn.addKey": "+ 新建密钥",
+        "btn.save": "保存",
+        "btn.cancel": "取消",
+        "btn.delete": "删除",
+        "btn.edit": "编辑",
+        "btn.create": "创建",
+        
+        // Labels
+        "label.search": "搜索",
+        "label.searchGroups": "搜索模型组…",
+        "label.loading": "加载中",
+        "label.loadingProviders": "加载供应商中…",
+        "label.loadingGroups": "加载模型组中…",
+        "label.noGroups": "暂无模型组。",
+        "label.useRefresh": "在供应商页签中使用「刷新所有模型」自动发现，或点击「+ 模型组」创建。",
+        "label.groupDescription": "模型组 = 为一个逻辑模型提供服务的供应商集合；供应商顺序即为组内故障转移顺序。",
+        
+        // Provider card
+        "provider.enabled": "已启用",
+        "provider.disabled": "已禁用",
+        "provider.models": "个模型",
+        "provider.latency": "延迟",
+        "provider.success": "成功率",
+        "provider.requests": "请求数",
+        
+        // Modals
+        "modal.addProvider": "添加供应商",
+        "modal.editProvider": "编辑供应商",
+        "modal.addGroup": "添加模型组",
+        "modal.editGroup": "编辑模型组",
+        "modal.addKey": "创建 API 密钥",
+        "modal.confirmDelete": "确认删除",
+        "modal.confirmDeleteMsg": "确定要删除吗",
+        
+        // Form labels
+        "form.name": "名称",
+        "form.apiKey": "API 密钥",
+        "form.baseUrl": "基础 URL",
+        "form.priority": "优先级",
+        "form.enabled": "启用",
+        "form.models": "模型",
+        "form.providers": "供应商",
+        "form.selectProviders": "选择要包含的供应商（顺序 = 故障转移优先级）",
+        
+        // Toast messages
+        "toast.saved": "已保存",
+        "toast.deleted": "已删除",
+        "toast.created": "已创建",
+        "toast.error": "错误",
+        "toast.saveFailed": "保存失败",
+        
+        // Misc
+        "misc.ms": "毫秒",
+        "misc.uptime": "运行时间",
+        "misc.refreshTs": "刷新于",
+    }
+};
+
+let currentLang = localStorage.getItem('crsllm-lang') || 'zh';
+
+function t(key) {
+    return I18N[currentLang][key] || I18N.en[key] || key;
+}
+
+function setLang(lang) {
+    currentLang = lang;
+    localStorage.setItem('crsllm-lang', lang);
+    document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+    applyTranslations();
+}
+
+function applyTranslations() {
+    // Update all elements with data-i18n attribute
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        el.textContent = t(key);
+    });
+    // Update placeholders
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.getAttribute('data-i18n-placeholder');
+        el.placeholder = t(key);
+    });
+    // Update aria-labels
+    document.querySelectorAll('[data-i18n-aria]').forEach(el => {
+        const key = el.getAttribute('data-i18n-aria');
+        el.setAttribute('aria-label', t(key));
+    });
+}
+
+function toggleLang() {
+    setLang(currentLang === 'zh' ? 'en' : 'zh');
+}
 
 /* ═══════════ state ═══════════ */
 let metricsData = {};
@@ -1367,6 +1595,7 @@ document.addEventListener("keydown", (e) => {
 
 /* ═══════════ boot ═══════════ */
 refreshAll();
+applyTranslations();
 setInterval(refreshAll, 5000);
 setInterval(refreshLogs, 4000);
 if ("scrollRestoration" in history) history.scrollRestoration = "manual";
