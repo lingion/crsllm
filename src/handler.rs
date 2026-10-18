@@ -18,6 +18,7 @@ use std::sync::Arc;
 use crate::router::Router;
 use crate::translator;
 use crate::streaming;
+use crate::responses;
 
 /// Shared state holding the router.
 pub type AppState = Arc<Router>;
@@ -1057,6 +1058,260 @@ pub async fn openai_chat_completions(
     } else {
         non_streaming_response(&router, &anthropic_req, &model_group).await
     }
+}
+
+/// OpenAI Responses API endpoint (`POST /v1/responses`).
+///
+/// This is the newest OpenAI protocol, supporting:
+/// - `input` as string or array of typed items (messages, function calls, tool results)
+/// - `instructions` for system-level guidance
+/// - Rich tool definitions (function, web_search, code_interpreter, file_search)
+/// - Streaming with granular events (response.created → response.output_text.delta → response.completed)
+pub async fn openai_responses(
+    State(router): State<AppState>,
+    _headers: HeaderMap,
+    Json(payload): Json<serde_json::Value>,
+) -> Response {
+    // Parse as Responses API request.
+    let req: responses::ResponsesRequest = match serde_json::from_value(payload) {
+        Ok(r) => r,
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({
+                    "error": {
+                        "type": "invalid_request_error",
+                        "message": format!("Invalid Responses API request: {}", e),
+                        "param": null,
+                        "code": "invalid_request"
+                    }
+                })),
+            )
+                .into_response();
+        }
+    };
+
+    let want_stream = req.stream;
+
+    // Translate to internal Anthropic format.
+    let anthropic_req = responses::to_anthropic(&req);
+    let model_group = anthropic_req.model.clone();
+
+    if want_stream {
+        responses_stream_response(router, &req, &anthropic_req, &model_group).await
+    } else {
+        responses_non_streaming(&router, &req, &anthropic_req, &model_group).await
+    }
+}
+
+/// Non-streaming Responses API: route, translate response back to Responses format.
+async fn responses_non_streaming(
+    router: &Router,
+    req: &responses::ResponsesRequest,
+    anthropic_req: &crate::translator::AnthropicRequest,
+    model_group: &str,
+) -> Response {
+    match router.route(model_group, anthropic_req).await {
+        Ok(anthropic_resp) => {
+            let responses_resp = responses::from_anthropic(&anthropic_resp, req);
+            (StatusCode::OK, Json(serde_json::to_value(&responses_resp).unwrap_or_default()))
+                .into_response()
+        }
+        Err(e) => {
+            let status = e.status.unwrap_or(503);
+            let code = StatusCode::from_u16(status.min(599)).unwrap_or(StatusCode::SERVICE_UNAVAILABLE);
+            (
+                code,
+                Json(json!({
+                    "error": {
+                        "type": "server_error",
+                        "message": e.body,
+                    }
+                })),
+            )
+                .into_response()
+        }
+    }
+}
+
+/// Streaming Responses API: translate internal SSE stream to Responses API events.
+async fn responses_stream_response(
+    router: Arc<Router>,
+    req: &responses::ResponsesRequest,
+    anthropic_req: &crate::translator::AnthropicRequest,
+    _model_group: &str,
+) -> Response {
+    let req_owned = anthropic_req.clone();
+    let _responses_req_owned = req.clone();
+
+    // Build the initial response skeleton for streaming events.
+    let resp_id = format!("resp_{}", uuid::Uuid::new_v4().to_string().replace('-', ""));
+    let msg_id = format!("msg_{}", uuid::Uuid::new_v4().to_string().replace('-', ""));
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
+    let initial_resp = responses::ResponsesResponse {
+        id: resp_id.clone(),
+        object: "response".to_string(),
+        created_at: now,
+        model: req.model.clone(),
+        output: vec![],
+        usage: responses::ResponsesUsage {
+            input_tokens: 0,
+            output_tokens: 0,
+            total_tokens: 0,
+            input_tokens_details: None,
+            output_tokens_details: None,
+        },
+        status: Some("in_progress".to_string()),
+        error: None,
+        incomplete_details: None,
+        metadata: req.metadata.clone(),
+        temperature: req.temperature,
+        top_p: req.top_p,
+        max_output_tokens: req.max_output_tokens,
+        previous_response_id: req.previous_response_id.clone(),
+        reasoning: req.reasoning.clone(),
+        text: req.text.clone(),
+        tool_choice: req.tool_choice.clone(),
+        tools: if req.tools.is_empty() {
+            None
+        } else {
+            Some(
+                req.tools
+                    .iter()
+                    .map(|t| serde_json::to_value(t).unwrap_or(json!({})))
+                    .collect(),
+            )
+        },
+        parallel_tool_calls: req.parallel_tool_calls,
+        user: req.user.clone(),
+    };
+
+    let stream = streaming::stream_with_fallback(router, req_owned.model.clone(), req_owned);
+
+    // Wrap the upstream SSE stream and translate to Responses API events.
+    let translated_stream = async_stream::stream! {
+        use futures::StreamExt;
+        use crate::error::ProviderError;
+
+        // Emit response.created
+        yield Ok::<String, ProviderError>(responses::stream_event_created(&initial_resp));
+        // Emit response.in_progress
+        yield Ok(responses::stream_event_in_progress(&initial_resp));
+        // Emit output_item.added (message)
+        yield Ok(responses::stream_event_output_item_added(&msg_id, "assistant"));
+        // Emit content_part.added
+        yield Ok(responses::stream_event_content_part_added(&msg_id));
+
+        let mut full_text = String::new();
+        let mut tool_call_id = String::new();
+        let mut tool_call_name = String::new();
+        let mut tool_call_args = String::new();
+        let mut in_tool_call = false;
+
+        let mut pinned = std::pin::pin!(stream);
+        while let Some(chunk_result) = pinned.next().await {
+            match chunk_result {
+                Ok(event_str) => {
+                    // Check for tool call deltas from upstream.
+                    let tool_delta: Option<(String, String, String)> = responses::extract_tool_call_delta_from_upstream(&event_str);
+                    if let Some((id, name, args_delta)) = tool_delta {
+                        if !id.is_empty() {
+                            tool_call_id = id.clone();
+                        }
+                        if !name.is_empty() {
+                            tool_call_name = name.clone();
+                            in_tool_call = true;
+                        }
+                        if !args_delta.is_empty() {
+                            tool_call_args.push_str(&args_delta);
+                            yield Ok(responses::stream_event_function_call_args_delta(
+                                &tool_call_id,
+                                &tool_call_name,
+                                &args_delta,
+                            ));
+                        }
+                        continue;
+                    }
+
+                    // Check for text deltas.
+                    let text_delta: Option<String> = responses::extract_text_delta_from_upstream(&event_str);
+                    if let Some(delta) = text_delta {
+                        full_text.push_str(&delta);
+                        yield Ok(responses::stream_event_text_delta(&delta));
+                    }
+
+                    // Check for stream done.
+                    if responses::is_stream_done(&event_str) {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    yield Ok(responses::stream_event_failed(&e.body));
+                    return;
+                }
+            }
+        }
+
+        // Emit completion events.
+        if in_tool_call && !tool_call_id.is_empty() {
+            yield Ok(responses::stream_event_function_call_args_done(
+                &tool_call_id,
+                &tool_call_name,
+                &tool_call_args,
+            ));
+        }
+
+        if !full_text.is_empty() {
+            yield Ok(responses::stream_event_text_done(&msg_id, &full_text));
+            yield Ok(responses::stream_event_content_part_done(&msg_id, &full_text));
+        }
+        yield Ok(responses::stream_event_output_item_done(&msg_id, &full_text));
+
+        // Build final completed response.
+        let mut final_resp = initial_resp.clone();
+        let mut output_items = Vec::new();
+        if !full_text.is_empty() {
+            output_items.push(responses::ResponsesOutputItem::Message {
+                id: msg_id.clone(),
+                role: "assistant".to_string(),
+                content: vec![responses::ResponsesOutputContent::OutputText {
+                    text: full_text.clone(),
+                    annotations: vec![],
+                }],
+                status: Some("completed".to_string()),
+            });
+        }
+        if in_tool_call && !tool_call_id.is_empty() {
+            output_items.push(responses::ResponsesOutputItem::FunctionCall {
+                id: format!("fc_{}", tool_call_id),
+                call_id: tool_call_id.clone(),
+                name: tool_call_name.clone(),
+                arguments: tool_call_args.clone(),
+                status: Some("completed".to_string()),
+            });
+        }
+        final_resp.output = output_items;
+        final_resp.status = Some("completed".to_string());
+
+        yield Ok(responses::stream_event_completed(&final_resp));
+    };
+
+    let body = axum::body::Body::from_stream(translated_stream);
+    let mut response = Response::new(body);
+    *response.status_mut() = StatusCode::OK;
+    response.headers_mut().insert(
+        "content-type",
+        HeaderValue::from_static("text/event-stream; charset=utf-8"),
+    );
+    response.headers_mut().insert(
+        "cache-control",
+        HeaderValue::from_static("no-cache"),
+    );
+    response
 }
 
 /// Non-streaming response: route, translate, return JSON.

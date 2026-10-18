@@ -6,6 +6,7 @@ pub mod error;
 pub mod handler;
 pub mod metrics;
 pub mod model_resolver;
+pub mod responses;
 pub mod router;
 pub mod streaming;
 pub mod translator;
@@ -106,6 +107,7 @@ async fn main() {
         .route("/api/providers/:name/test", post(handler::test_provider))
         .route("/v1/messages", post(handler::anthropic_messages))
         .route("/v1/chat/completions", post(handler::openai_chat_completions))
+        .route("/v1/responses", post(handler::openai_responses))
         .route("/v1/models", get(handler::list_models))
         .with_state(router.clone())
         .layer(from_fn_with_state(router, handler::gateway_auth));
