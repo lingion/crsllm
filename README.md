@@ -93,10 +93,22 @@ crsllm/
 
 ```bash
 git clone https://github.com/lingion/crsllm && cd crsllm
-cargo build --release
 
-cp config/crsllm.toml.example config/crsllm.toml   # then add your provider keys
-./target/release/crsllm                            # listens on 0.0.0.0:3002
+# Option A: one-command install
+make install          # builds release binary → ~/.cargo/bin/crsllm
+crsllm --init         # create config from template, then add your keys
+crsllm                # start the gateway on :3002
+
+# Option B: run from source
+make run              # auto-creates config if missing, builds & runs
+```
+
+Or manually:
+
+```bash
+cargo build --release
+./target/release/crsllm --init    # create config from template
+./target/release/crsllm           # listens on 0.0.0.0:3002
 ```
 
 Open the console at **http://127.0.0.1:3002/dashboard** and you're operating:
@@ -110,11 +122,15 @@ Open the console at **http://127.0.0.1:3002/dashboard** and you're operating:
 | **API Keys** | **Create the client keys for Codex / Claude Code / anything else** |
 | Logs | Live request log: status, upstream used, latency, TTFT, token counts |
 
-CLI extras:
+CLI reference:
 
 ```bash
-crsllm --port 8080                                   # custom port (default 3002)
-crsllm --discover-models [--config path/to/crsllm.toml]   # probe every provider, save discoveries
+crsllm --help                          # show all options
+crsllm --version                       # show version
+crsllm --init                          # create config/crsllm.toml from template
+crsllm --port 8080                     # custom port (default 3002)
+crsllm --config path/to/crsllm.toml    # custom config path
+crsllm --discover-models               # probe every provider, save discoveries
 ```
 
 ## Connecting Codex & Claude Code

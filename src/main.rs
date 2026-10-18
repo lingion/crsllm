@@ -19,18 +19,139 @@ use axum::{
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+const HELP_TEXT: &str = r#"crsllm — Cross-provider Resilient Smart LLM Gateway
+
+USAGE:
+    crsllm [OPTIONS]
+
+OPTIONS:
+    -h, --help                 Show this help message
+    -V, --version              Show version information
+    -p, --port <PORT>          Port to listen on (default: 3002)
+    -c, --config <PATH>        Config file path (default: config/crsllm.toml)
+    --init                     Initialize config from example template
+    --discover-models          Discover available models from all providers
+
+EXAMPLES:
+    crsllm                     Start with default config on port 3002
+    crsllm --port 8080         Start on custom port
+    crsllm --init              Create config/crsllm.toml from template
+    crsllm --discover-models   Fetch models from all configured providers
+
+ENDPOINTS:
+    POST /v1/messages          Anthropic Messages API
+    POST /v1/chat/completions  OpenAI Chat Completions API
+    POST /v1/responses         OpenAI Responses API
+    GET  /v1/models            List available models
+    GET  /health               Health check
+    GET  /dashboard            Web dashboard
+"#;
+
+/// Find the example config template, checking next to the target path first,
+/// then falling back to the project's config/ directory.
+fn find_example_template(config_path: &str) -> Option<String> {
+    // 1. Next to the target: config/crsllm.toml.example
+    let sibling = config_path.replace(".toml", ".toml.example");
+    if std::path::Path::new(&sibling).exists() {
+        return Some(sibling);
+    }
+    // 2. Project config directory: config/crsllm.toml.example
+    let project = "config/crsllm.toml.example";
+    if std::path::Path::new(project).exists() {
+        return Some(project.to_string());
+    }
+    None
+}
+
+/// Ensure config/crsllm.toml exists; if not, copy from .example template.
+fn ensure_config(config_path: &str) -> Result<(), String> {
+    if std::path::Path::new(config_path).exists() {
+        return Ok(());
+    }
+    let example = find_example_template(config_path).ok_or_else(|| {
+        format!("Config not found: {}\nRun `crsllm --init` or create it manually.", config_path)
+    })?;
+    // Ensure parent directory exists
+    if let Some(parent) = std::path::Path::new(config_path).parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create config directory: {}", e))?;
+    }
+    std::fs::copy(&example, config_path)
+        .map_err(|e| format!("Failed to create config from template: {}", e))?;
+    println!("✓ Created {} from template", config_path);
+    println!("  Edit it to add your API keys, then run `crsllm` again.");
+    Err(format!("Config initialized at {}. Please edit it and restart.", config_path))
+}
+
+/// Handle --init: copy example config to real path.
+fn init_config(config_path: &str) {
+    if std::path::Path::new(config_path).exists() {
+        println!("Config already exists: {}", config_path);
+        return;
+    }
+    let example = match find_example_template(config_path) {
+        Some(e) => e,
+        None => {
+            eprintln!("Template not found: config/crsllm.toml.example");
+            std::process::exit(1);
+        }
+    };
+    if let Some(parent) = std::path::Path::new(config_path).parent() {
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            eprintln!("Failed to create directory: {}", e);
+            std::process::exit(1);
+        }
+    }
+    match std::fs::copy(&example, config_path) {
+        Ok(_) => {
+            println!("✓ Created {}", config_path);
+            println!("  Edit it to add your API keys, then run `crsllm`.");
+        }
+        Err(e) => {
+            eprintln!("Failed to create config: {}", e);
+            std::process::exit(1);
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    // CLI: --discover-models prints discovered models from all providers
     let args: Vec<String> = std::env::args().collect();
-    if args.len() > 1 && args[1] == "--discover-models" {
-        let config_path = if args.len() > 2 && args[2] == "--config" {
-            args.get(3).cloned().unwrap_or_else(|| "config/crsllm.toml".to_string())
-        } else {
-            "config/crsllm.toml".to_string()
-        };
+
+    // Handle --help / -h
+    if args.iter().any(|a| a == "--help" || a == "-h") {
+        print!("{}", HELP_TEXT);
+        return;
+    }
+
+    // Handle --version / -V
+    if args.iter().any(|a| a == "--version" || a == "-V") {
+        println!("crsllm {}", VERSION);
+        return;
+    }
+
+    // Resolve config path from args
+    let config_path = args.iter().position(|a| a == "--config" || a == "-c")
+        .and_then(|i| args.get(i + 1))
+        .cloned()
+        .unwrap_or_else(|| "config/crsllm.toml".to_string());
+
+    // Handle --init
+    if args.iter().any(|a| a == "--init") {
+        init_config(&config_path);
+        return;
+    }
+
+    // CLI: --discover-models prints discovered models from all providers
+    if args.iter().any(|a| a == "--discover-models") {
+        if let Err(e) = ensure_config(&config_path) {
+            eprintln!("{}", e);
+            std::process::exit(1);
+        }
 
         let mut config = config::load_config(&config_path).expect("Failed to load config");
         let registry = config::load_registry("config/providers.toml").expect("Failed to load registry");
@@ -62,7 +183,13 @@ async fn main() {
         return;
     }
 
-    let mut config = config::load_config("config/crsllm.toml").expect("Failed to load config");
+    // Auto-create config from template if missing
+    if let Err(e) = ensure_config(&config_path) {
+        eprintln!("{}", e);
+        std::process::exit(1);
+    }
+
+    let mut config = config::load_config(&config_path).expect("Failed to load config");
     let registry = config::load_registry("config/providers.toml").expect("Failed to load registry");
     config.merge_registry(&registry);
     
@@ -112,7 +239,7 @@ async fn main() {
         .with_state(router.clone())
         .layer(from_fn_with_state(router, handler::gateway_auth));
 
-    let port: u16 = args.iter().position(|a| a == "--port")
+    let port: u16 = args.iter().position(|a| a == "--port" || a == "-p")
         .and_then(|i| args.get(i + 1))
         .and_then(|p| p.parse().ok())
         .unwrap_or(3002);
