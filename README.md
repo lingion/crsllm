@@ -29,12 +29,73 @@
 
 ---
 
-## Preview
+## Features
+
+### Provider Management & Model Discovery
 
 <p align="center">
-  <img src="docs/screenshots/console-providers.png" width="48%" alt="CRSLLM console — providers">
-  <img src="docs/screenshots/console-keys.png" width="48%" alt="CRSLLM console — API keys">
+  <img src="docs/screenshots/console-providers.png" width="100%" alt="CRSLLM console — providers">
 </p>
+
+- **81 pre-configured providers** (OpenAI, Anthropic, Google, Azure, AWS Bedrock, etc.)
+- **Auto-discovery**: One-click to fetch all available models from each provider
+- **Health monitoring**: Real-time latency, success rate, and request counts
+- **Enable/disable** providers instantly without restart
+
+### Model Groups — Automatic Failover
+
+<p align="center">
+  <img src="docs/screenshots/console-groups.png" width="100%" alt="CRSLLM console — model groups">
+</p>
+
+- **Logical model abstraction**: Map `gpt-4o` to multiple providers with automatic failover
+- **Priority-based routing**: Ordered provider list with automatic fallback on errors
+- **Cross-provider fallback**: If OpenAI fails, automatically try Anthropic, then Google
+- **Zero-config discovery**: Auto-generated model groups from provider capabilities
+
+### Routed Models — Client-Facing Aliases
+
+<p align="center">
+  <img src="docs/screenshots/console-routed.png" width="100%" alt="CRSLLM console — routed models">
+</p>
+
+- **Stable API names**: Expose `my-gpt4` to clients, route to any backend model
+- **Hot-swap backends**: Change underlying models without client code changes
+- **A/B testing**: Route percentage of traffic to different model groups
+- **Version management**: Seamlessly upgrade from `gpt-4-0613` to `gpt-4o`
+
+### Fallback Chain — Global Resilience
+
+<p align="center">
+  <img src="docs/screenshots/console-fallback.png" width="100%" alt="CRSLLM console — fallback chain">
+</p>
+
+- **Cross-group failover**: If entire model group fails, try next in chain
+- **Configurable order**: Drag-and-drop priority adjustment
+- **Automatic recovery**: Failed groups are retried after cooldown
+- **Circuit breaker**: Prevents cascading failures
+
+### API Keys & Access Control
+
+<p align="center">
+  <img src="docs/screenshots/console-keys.png" width="100%" alt="CRSLLM console — API keys">
+</p>
+
+- **Multi-key support**: Create separate keys for different clients/apps
+- **Key rotation**: Generate new keys without downtime
+- **Usage tracking**: Monitor requests per API key
+- **Instant revocation**: Disable compromised keys immediately
+
+### Request Logs & Observability
+
+<p align="center">
+  <img src="docs/screenshots/console-logs.png" width="100%" alt="CRSLLM console — logs">
+</p>
+
+- **Real-time logs**: Live request stream with status, latency, and model used
+- **Error tracking**: Detailed error messages and upstream provider responses
+- **Performance metrics**: TTFT (Time To First Token), total latency, token counts
+- **Filtering**: Search by model, provider, status, or time range
 
 ## What is CRSLLM?
 

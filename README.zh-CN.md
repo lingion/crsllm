@@ -28,12 +28,73 @@
 
 ---
 
-## 预览
+## 功能特性
+
+### 供应商管理与模型发现
 
 <p align="center">
-  <img src="docs/screenshots/console-providers.png" width="48%" alt="CRSLLM 控制台 — 供应商">
-  <img src="docs/screenshots/console-keys.png" width="48%" alt="CRSLLM 控制台 — API 密钥">
+  <img src="docs/screenshots/console-providers.png" width="100%" alt="CRSLLM 控制台 — 供应商">
 </p>
+
+- **81 个预配置供应商**（OpenAI、Anthropic、Google、Azure、AWS Bedrock 等）
+- **自动发现**：一键获取每个供应商的所有可用模型
+- **健康监控**：实时延迟、成功率和请求计数
+- **即时启停**：无需重启即可启用/禁用供应商
+
+### 模型组 — 自动故障转移
+
+<p align="center">
+  <img src="docs/screenshots/console-groups.png" width="100%" alt="CRSLLM 控制台 — 模型组">
+</p>
+
+- **逻辑模型抽象**：将 `gpt-4o` 映射到多个供应商，自动故障转移
+- **优先级路由**：有序供应商列表，错误时自动回退
+- **跨供应商回退**：OpenAI 失败时自动尝试 Anthropic，再尝试 Google
+- **零配置发现**：从供应商能力自动生成模型组
+
+### 路由模型 — 客户端别名
+
+<p align="center">
+  <img src="docs/screenshots/console-routed.png" width="100%" alt="CRSLLM 控制台 — 路由模型">
+</p>
+
+- **稳定 API 名称**：向客户端暴露 `my-gpt4`，路由到任意后端模型
+- **热切换后端**：无需修改客户端代码即可更换底层模型
+- **A/B 测试**：将流量百分比路由到不同模型组
+- **版本管理**：从 `gpt-4-0613` 无缝升级到 `gpt-4o`
+
+### 回退链 — 全局韧性
+
+<p align="center">
+  <img src="docs/screenshots/console-fallback.png" width="100%" alt="CRSLLM 控制台 — 回退链">
+</p>
+
+- **跨组回退**：整个模型组失败时，尝试链中的下一个
+- **可配置顺序**：拖放调整优先级
+- **自动恢复**：失败的组在冷却后重试
+- **熔断器**：防止级联故障
+
+### API 密钥与访问控制
+
+<p align="center">
+  <img src="docs/screenshots/console-keys.png" width="100%" alt="CRSLLM 控制台 — API 密钥">
+</p>
+
+- **多密钥支持**：为不同客户端/应用创建独立密钥
+- **密钥轮换**：生成新密钥而不停机
+- **使用追踪**：监控每个 API 密钥的请求
+- **即时吊销**：立即禁用泄露的密钥
+
+### 请求日志与可观测性
+
+<p align="center">
+  <img src="docs/screenshots/console-logs.png" width="100%" alt="CRSLLM 控制台 — 日志">
+</p>
+
+- **实时日志**：实时请求流，包含状态、延迟和使用的模型
+- **错误追踪**：详细错误消息和上游供应商响应
+- **性能指标**：TTFT（首 Token 时间）、总延迟、Token 计数
+- **过滤**：按模型、供应商、状态或时间范围搜索
 
 ## CRSLLM 是什么？
 
