@@ -53,7 +53,7 @@ ENDPOINTS:
 /// then falling back to the project's config/ directory.
 fn find_example_template(config_path: &str) -> Option<String> {
     // 1. Next to the target: config/crsllm.toml.example
-    let sibling = config_path.replace(".toml", ".toml.example");
+    let sibling = format!("{}.example", config_path);
     if std::path::Path::new(&sibling).exists() {
         return Some(sibling);
     }
@@ -137,6 +137,7 @@ async fn main() {
     // Resolve config path from args
     let config_path = args.iter().position(|a| a == "--config" || a == "-c")
         .and_then(|i| args.get(i + 1))
+        .filter(|v| !v.starts_with('-'))
         .cloned()
         .unwrap_or_else(|| "config/crsllm.toml".to_string());
 
@@ -241,6 +242,7 @@ async fn main() {
 
     let port: u16 = args.iter().position(|a| a == "--port" || a == "-p")
         .and_then(|i| args.get(i + 1))
+        .filter(|v| !v.starts_with('-'))
         .and_then(|p| p.parse().ok())
         .unwrap_or(3002);
     let addr = SocketAddr::from(([0, 0, 0, 0], port));

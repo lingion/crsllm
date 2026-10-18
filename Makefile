@@ -8,8 +8,11 @@ help: ## Show this help
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
 init: ## Initialize config from template
-	@test -f $(CONFIG) || (cp config/crsllm.toml.example $(CONFIG) && echo "✓ Created $(CONFIG) — edit it to add your API keys")
-	@test -f $(CONFIG) && echo "Config already exists: $(CONFIG)"
+	@if test -f $(CONFIG); then \
+		echo "Config already exists: $(CONFIG)"; \
+	else \
+		cp config/crsllm.toml.example $(CONFIG) && echo "✓ Created $(CONFIG) — edit it to add your API keys"; \
+	fi
 
 build: ## Build debug binary
 	cargo build

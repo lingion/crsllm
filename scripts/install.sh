@@ -18,7 +18,7 @@ cp "target/release/$BINARY" "$INSTALL_DIR/$BINARY"
 chmod +x "$INSTALL_DIR/$BINARY"
 
 # Check if install dir is in PATH
-if ! echo "$PATH" | tr ':' '\n' | grep -q "^$INSTALL_DIR$"; then
+if ! echo "$PATH" | tr ':' '\n' | grep -qF "$INSTALL_DIR"; then
     echo ""
     echo "⚠️  $INSTALL_DIR is not in your PATH."
     echo "   Add this to your shell profile (~/.zshrc or ~/.bashrc):"
