@@ -529,19 +529,12 @@ pub fn from_anthropic(
 
     let mut output_items = Vec::new();
     let mut function_calls = Vec::new();
+    let mut text_parts = Vec::new();
 
     for block in &anthropic_resp.content {
         match block {
             AnthropicResponseContent::Text { text } => {
-                output_items.push(ResponsesOutputItem::Message {
-                    id: msg_id.clone(),
-                    role: "assistant".to_string(),
-                    content: vec![ResponsesOutputContent::OutputText {
-                        text: text.clone(),
-                        annotations: vec![],
-                    }],
-                    status: Some("completed".to_string()),
-                });
+                text_parts.push(text.clone());
             }
             AnthropicResponseContent::ToolUse { id, name, input } => {
                 let args_str = serde_json::to_string(input).unwrap_or_else(|_| "{}".to_string());
@@ -556,13 +549,14 @@ pub fn from_anthropic(
         }
     }
 
-    // If no text output was produced, add an empty message.
-    if output_items.is_empty() && function_calls.is_empty() {
+    // Combine all text parts into a single message.
+    let combined_text = text_parts.join("\n");
+    if !combined_text.is_empty() || function_calls.is_empty() {
         output_items.push(ResponsesOutputItem::Message {
             id: msg_id,
             role: "assistant".to_string(),
             content: vec![ResponsesOutputContent::OutputText {
-                text: String::new(),
+                text: combined_text,
                 annotations: vec![],
             }],
             status: Some("completed".to_string()),
@@ -859,6 +853,7 @@ pub fn extract_text_delta_from_upstream(event: &str) -> Option<String> {
 
 /// Extract tool call information from an upstream SSE event.
 /// Returns `Some((call_id, name, arguments_delta))` if this is a tool call delta.
+/// Handles both OpenAI and Anthropic streaming formats.
 pub fn extract_tool_call_delta_from_upstream(event: &str) -> Option<(String, String, String)> {
     for line in event.lines() {
         let line = line.trim();
@@ -867,6 +862,41 @@ pub fn extract_tool_call_delta_from_upstream(event: &str) -> Option<(String, Str
                 return None;
             }
             if let Ok(val) = serde_json::from_str::<Value>(data) {
+                // Anthropic format: content_block_start with tool_use
+                if val.get("type").and_then(|v| v.as_str()) == Some("content_block_start") {
+                    if let Some(block) = val.get("content_block") {
+                        if block.get("type").and_then(|v| v.as_str()) == Some("tool_use") {
+                            let id = block
+                                .get("id")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string();
+                            let name = block
+                                .get("name")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string();
+                            if !id.is_empty() || !name.is_empty() {
+                                return Some((id, name, String::new()));
+                            }
+                        }
+                    }
+                }
+                // Anthropic format: content_block_delta with input_json_delta
+                if val.get("type").and_then(|v| v.as_str()) == Some("content_block_delta") {
+                    if let Some(delta) = val.get("delta") {
+                        if delta.get("type").and_then(|v| v.as_str()) == Some("input_json_delta") {
+                            let args = delta
+                                .get("partial_json")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string();
+                            if !args.is_empty() {
+                                return Some((String::new(), String::new(), args));
+                            }
+                        }
+                    }
+                }
                 // OpenAI format: choices[0].delta.tool_calls
                 if let Some(choices) = val.get("choices").and_then(|v| v.as_array()) {
                     if let Some(choice) = choices.first() {
@@ -1241,5 +1271,26 @@ mod tests {
         assert_eq!(anthropic.max_tokens, Some(4096));
         assert_eq!(anthropic.temperature, Some(0.7));
         assert_eq!(anthropic.top_p, Some(0.95));
+    }
+
+    #[test]
+    fn test_extract_tool_call_delta_anthropic_start() {
+        let event = "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"content_block\":{\"type\":\"tool_use\",\"id\":\"call_123\",\"name\":\"get_weather\"}}\n\n";
+        let delta = extract_tool_call_delta_from_upstream(event);
+        assert_eq!(delta, Some(("call_123".to_string(), "get_weather".to_string(), String::new())));
+    }
+
+    #[test]
+    fn test_extract_tool_call_delta_anthropic_args() {
+        let event = "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"location\\\":\"}}\n\n";
+        let delta = extract_tool_call_delta_from_upstream(event);
+        assert_eq!(delta, Some((String::new(), String::new(), "{\"location\":".to_string())));
+    }
+
+    #[test]
+    fn test_extract_tool_call_delta_openai() {
+        let event = "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"id\":\"call_456\",\"function\":{\"name\":\"search\",\"arguments\":\"{\\\"q\\\":\"}}]}}]}\n\n";
+        let delta = extract_tool_call_delta_from_upstream(event);
+        assert_eq!(delta, Some(("call_456".to_string(), "search".to_string(), "{\"q\":".to_string())));
     }
 }

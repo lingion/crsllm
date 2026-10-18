@@ -1114,8 +1114,22 @@ async fn responses_non_streaming(
     match router.route(model_group, anthropic_req).await {
         Ok(anthropic_resp) => {
             let responses_resp = responses::from_anthropic(&anthropic_resp, req);
-            (StatusCode::OK, Json(serde_json::to_value(&responses_resp).unwrap_or_default()))
-                .into_response()
+            match serde_json::to_value(&responses_resp) {
+                Ok(v) => (StatusCode::OK, Json(v)).into_response(),
+                Err(e) => {
+                    tracing::error!("Failed to serialize responses response: {}", e);
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(json!({
+                            "error": {
+                                "type": "server_error",
+                                "message": "Failed to serialize response"
+                            }
+                        })),
+                    )
+                        .into_response()
+                }
+            }
         }
         Err(e) => {
             let status = e.status.unwrap_or(503);
@@ -1203,14 +1217,13 @@ async fn responses_stream_response(
         yield Ok(responses::stream_event_in_progress(&initial_resp));
         // Emit output_item.added (message)
         yield Ok(responses::stream_event_output_item_added(&msg_id, "assistant"));
-        // Emit content_part.added
-        yield Ok(responses::stream_event_content_part_added(&msg_id));
 
         let mut full_text = String::new();
-        let mut tool_call_id = String::new();
-        let mut tool_call_name = String::new();
-        let mut tool_call_args = String::new();
-        let mut in_tool_call = false;
+        let mut content_part_emitted = false;
+        let mut tool_calls: Vec<(String, String, String)> = Vec::new(); // (id, name, args)
+        let mut current_tool_id = String::new();
+        let mut current_tool_name = String::new();
+        let mut current_tool_args = String::new();
 
         let mut pinned = std::pin::pin!(stream);
         while let Some(chunk_result) = pinned.next().await {
@@ -1219,18 +1232,27 @@ async fn responses_stream_response(
                     // Check for tool call deltas from upstream.
                     let tool_delta: Option<(String, String, String)> = responses::extract_tool_call_delta_from_upstream(&event_str);
                     if let Some((id, name, args_delta)) = tool_delta {
-                        if !id.is_empty() {
-                            tool_call_id = id.clone();
+                        // New tool call started (has id or name)
+                        if !id.is_empty() || !name.is_empty() {
+                            // Save previous tool call if exists
+                            if !current_tool_id.is_empty() {
+                                tool_calls.push((
+                                    current_tool_id.clone(),
+                                    current_tool_name.clone(),
+                                    current_tool_args.clone(),
+                                ));
+                            }
+                            // Start new tool call
+                            current_tool_id = if !id.is_empty() { id } else { current_tool_id };
+                            current_tool_name = if !name.is_empty() { name } else { current_tool_name };
+                            current_tool_args = String::new();
                         }
-                        if !name.is_empty() {
-                            tool_call_name = name.clone();
-                            in_tool_call = true;
-                        }
+                        // Append arguments delta
                         if !args_delta.is_empty() {
-                            tool_call_args.push_str(&args_delta);
+                            current_tool_args.push_str(&args_delta);
                             yield Ok(responses::stream_event_function_call_args_delta(
-                                &tool_call_id,
-                                &tool_call_name,
+                                &current_tool_id,
+                                &current_tool_name,
                                 &args_delta,
                             ));
                         }
@@ -1240,6 +1262,11 @@ async fn responses_stream_response(
                     // Check for text deltas.
                     let text_delta: Option<String> = responses::extract_text_delta_from_upstream(&event_str);
                     if let Some(delta) = text_delta {
+                        // Emit content_part.added on first text delta
+                        if !content_part_emitted {
+                            yield Ok(responses::stream_event_content_part_added(&msg_id));
+                            content_part_emitted = true;
+                        }
                         full_text.push_str(&delta);
                         yield Ok(responses::stream_event_text_delta(&delta));
                     }
@@ -1256,16 +1283,26 @@ async fn responses_stream_response(
             }
         }
 
-        // Emit completion events.
-        if in_tool_call && !tool_call_id.is_empty() {
-            yield Ok(responses::stream_event_function_call_args_done(
-                &tool_call_id,
-                &tool_call_name,
-                &tool_call_args,
+        // Save last tool call if exists
+        if !current_tool_id.is_empty() {
+            tool_calls.push((
+                current_tool_id.clone(),
+                current_tool_name.clone(),
+                current_tool_args.clone(),
             ));
         }
 
-        if !full_text.is_empty() {
+        // Emit completion events for tool calls
+        for (tool_id, tool_name, tool_args) in &tool_calls {
+            yield Ok(responses::stream_event_function_call_args_done(
+                tool_id,
+                tool_name,
+                tool_args,
+            ));
+        }
+
+        // Emit completion events for text
+        if content_part_emitted && !full_text.is_empty() {
             yield Ok(responses::stream_event_text_done(&msg_id, &full_text));
             yield Ok(responses::stream_event_content_part_done(&msg_id, &full_text));
         }
@@ -1285,12 +1322,13 @@ async fn responses_stream_response(
                 status: Some("completed".to_string()),
             });
         }
-        if in_tool_call && !tool_call_id.is_empty() {
+        // Add all tool calls
+        for (tool_id, tool_name, tool_args) in &tool_calls {
             output_items.push(responses::ResponsesOutputItem::FunctionCall {
-                id: format!("fc_{}", tool_call_id),
-                call_id: tool_call_id.clone(),
-                name: tool_call_name.clone(),
-                arguments: tool_call_args.clone(),
+                id: format!("fc_{}", tool_id),
+                call_id: tool_id.clone(),
+                name: tool_name.clone(),
+                arguments: tool_args.clone(),
                 status: Some("completed".to_string()),
             });
         }
